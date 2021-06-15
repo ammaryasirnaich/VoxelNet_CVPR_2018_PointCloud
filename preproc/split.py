@@ -40,24 +40,24 @@ def rearrange(original_folders, target_folders, split_file):
 if __name__ == '__main__':
     # Original folder
     original_folders = dict()
-    original_folders['IMG_ROOT'] = './data/KITTI/image/training/image_2/'
-    original_folders['PC_ROOT'] = './data/KITTI/point_cloud/training/velodyne/'
-    original_folders['LABEL_ROOT'] = './data/KITTI/label/training/label_2/'
+    original_folders['IMG_ROOT'] = '/data/MD_KITTI/training/image_2/'
+    original_folders['PC_ROOT'] = '/data/MD_KITTI/training/velodyne/'
+    original_folders['LABEL_ROOT'] = '/data/MD_KITTI/training/label_2/'
 
     # Modified folder
     train_folders = dict()
-    train_folders['IMG_ROOT'] = './data/MD_KITTI/training/image_2/'
-    train_folders['PC_ROOT'] = './data/MD_KITTI/training/velodyne/'
-    train_folders['LABEL_ROOT'] = './data/MD_KITTI/training/label_2/'
+    train_folders['IMG_ROOT'] = '/data/KITTI/training/image_2/'
+    train_folders['PC_ROOT'] = '/data/KITTI/training/velodyne/'
+    train_folders['LABEL_ROOT'] = '/data/KITTI/training/label_2/'
 
     val_folders = dict()
-    val_folders['IMG_ROOT'] = './data/MD_KITTI/validation/image_2/'
-    val_folders['PC_ROOT'] = './data/MD_KITTI/validation/velodyne/'
-    val_folders['LABEL_ROOT'] = './data/MD_KITTI/validation/label_2/'
+    val_folders['IMG_ROOT'] = '/data/KITTI/validation/image_2/'
+    val_folders['PC_ROOT'] = '/data/KITTI/validation/velodyne/'
+    val_folders['LABEL_ROOT'] = '/data/KITTI/validation/label_2/'
 
     # Split file
-    train_split_file = './data/KITTI/imagesets/ImageSets/train.txt'
-    val_split_file = './data/KITTI/imagesets/ImageSets/val.txt'
+    train_split_file = '/data/KITTI/imagesets/train.txt'
+    val_split_file = '/data/KITTI/imagesets/val.txt'
 
     rearrange(original_folders, train_folders, train_split_file)
     rearrange(original_folders, val_folders, val_split_file)

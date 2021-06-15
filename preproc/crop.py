@@ -95,9 +95,9 @@ def align_img_and_pc(img_dir, pc_dir, calib_dir):
 if __name__ == '__main__':
 
     # Update the following directories
-    IMG_ROOT = './data/KITTI/image/training/image_2/'
-    PC_ROOT = './data/KITTI/point_cloud/training/velodyne/'
-    CALIB_ROOT = './data/KITTI/calib/training/calib/'
+    IMG_ROOT = '/data/MD_KITTI/training/image_2/'
+    PC_ROOT = '/data/MD_KITTI/training/velodyne/'
+    CALIB_ROOT = '/data/MD_KITTI/training/calib/'
 
     for frame in range(0, 7481):
         img_dir = IMG_ROOT + '%06d.png' % frame
