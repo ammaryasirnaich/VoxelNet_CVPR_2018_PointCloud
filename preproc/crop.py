@@ -1,6 +1,7 @@
 import numpy as np
-from scipy.misc import imread
-
+## Note: the below module from scipy has been depricated, hence, using opencv imread module
+# from scipy.misc import imread      
+from cv2 import imread
 import pdb
 
 CAM = 2
