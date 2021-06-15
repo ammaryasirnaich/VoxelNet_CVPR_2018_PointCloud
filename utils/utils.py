@@ -10,6 +10,7 @@ from config import cfg
 from utils.box_overlaps import *
 
 import pdb
+import numpy as np
 
 
 #Util function to load calib matrices
@@ -396,37 +397,73 @@ def draw_lidar_box3d_on_image(img, boxes3d, scores, gt_boxes3d = np.array([]), c
     projections = lidar_box3d_to_camera_box(boxes3d, cal_projection = True, P2 = P2, T_VELO_2_CAM = T_VELO_2_CAM, R_RECT_0 = R_RECT_0)
     gt_projections = lidar_box3d_to_camera_box(gt_boxes3d, cal_projection = True, P2 = P2, T_VELO_2_CAM = T_VELO_2_CAM, R_RECT_0 = R_RECT_0)
 
-    # Draw projections
+
+    # #Note:AMMAR checking for any Nan elements   
+    # if (np.isnan(projections.any()) or np.isnan(gt_projections.any()) ):
+    #     np.savetxt("image.txt", img)
+    #     np.savetxt("boxes3d.txt", boxes3d)
+    #     np.savetxt("gt_boxes3d.txt", gt_boxes3d)
+    #     np.savetxt("scores.txt", scores)
+             
+    #     return
+       
+
+    # Draw projections 
     for qs in projections:
+        
         for k in range(0, 4):
             i, j = k, (k + 1) % 4
+            
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
                                                  qs[j, 1]), color, thickness, cv2.LINE_AA)
-
+        
             i, j = k + 4, (k + 1) % 4 + 4
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
                                                  qs[j, 1]), color, thickness, cv2.LINE_AA)
 
             i, j = k, k + 4
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
+                                                 
                                                  qs[j, 1]), color, thickness, cv2.LINE_AA)
     # Draw gt projections
     for qs in gt_projections:
         for k in range(0, 4):
             i, j = k, (k + 1) % 4
+            
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
                                                  qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
 
-            i, j = k + 4, (k + 1) % 4 + 4
+            i, j = k + 4, (k + 1) % 4 + 4      
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
                                                  qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
 
             i, j = k, k + 4
+            #Note:Ammar
+            conver_nan_zero(qs,i,j) #check if nan and handle the issue
             cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
                                                  qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
 
     return cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2RGB)
-    
+
+
+# check for nan and convert them into 0 else an Interger value
+def conver_nan_zero(qs,i,j):
+    qs[i, 0] = 0 if np.isnan(qs[i, 0]) else  qs[i, 0]
+    qs[i, 1] = 0 if np.isnan(qs[i, 1]) else  qs[i, 1]
+    qs[j, 0] = 0 if np.isnan(qs[j, 0]) else  qs[j, 0]
+    qs[j, 1] = 0 if np.isnan(qs[j, 1]) else  qs[j, 1]
+    return qs
+        
 
 
 def draw_lidar_box3d_on_birdview(birdview, boxes3d, scores, gt_boxes3d = np.array([]),
