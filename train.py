@@ -20,6 +20,7 @@ from utils.utils import box3d_to_label
 from model.model import RPN3D
 from loader.kitti import KITTI as Dataset
 from loader.kitti import collate_fn
+from torchvision import transforms
 
 import pdb
 
@@ -30,7 +31,7 @@ parser.add_argument('--lr', type = float, default = 0.01, help = 'initial learni
 parser.add_argument('--alpha', type = float, default = 1.5, help = 'alpha in loss function')
 parser.add_argument('--beta', type = float, default = 1, help = 'beta in loss function')
 
-parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')
+parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')  # default epoch was 1
 parser.add_argument('--batch_size', type = int, default = 1, help = 'batch size')
 parser.add_argument('--workers', type = int, default = 4)
 
@@ -60,6 +61,8 @@ def run():
     start_epoch = 0
     global_counter = 0
     min_loss = sys.float_info.max
+    
+    
 
     # Build data loader
     train_dataset = Dataset(os.path.join(cfg.DATA_DIR, 'training'), shuffle = True, aug = True, is_testset = False)
@@ -69,12 +72,15 @@ def run():
     val_dataset = Dataset(os.path.join(cfg.DATA_DIR, 'validation'), shuffle = False, aug = False, is_testset = False)
     val_dataloader = DataLoader(val_dataset, batch_size = args.batch_size, shuffle = False, collate_fn = collate_fn,
                                 num_workers = args.workers, pin_memory = False)
+   
+    #Note: Ammaar 
     val_dataloader_iter = iter(val_dataloader)
 
     # Build model
     model = RPN3D(cfg.DETECT_OBJ, args.alpha, args.beta)
 
     # Resume model if necessary
+    
     if args.resumed_model:
         model_file = os.path.join(save_model_dir, args.resumed_model)
         if os.path.isfile(model_file):
@@ -122,6 +128,13 @@ def run():
 
             start_time = time.time()
 
+
+           
+
+            #Note:Ammar Yasir
+            optimizer.zero_grad()
+
+
             # Forward pass for training
             _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
 
@@ -133,7 +146,9 @@ def run():
             clip_grad_norm_(model.parameters(), 5)
 
             optimizer.step()
-            optimizer.zero_grad()
+            
+            #Note:Ammar, zero_grad() should be before called before optimizer.step
+            # optimizer.zero_grad()
 
             batch_time = time.time() - batch_time
 
@@ -143,7 +158,7 @@ def run():
                        'cls_neg_loss: {:.4f} forward time: {:.4f} batch time: {:.4f}'.format(
                     counter, epoch + 1, args.max_epoch, loss.item(), reg_loss.item(), cls_loss.item(), cls_pos_loss_rec.item(),
                     cls_neg_loss_rec.item(), forward_time, batch_time)
-                info = '{}\t'.format(time.asctime(time.localtime())) + info
+                info = '{}\t'.format(time.asctime(time.localtime())) +"Data instance {}".format(i)+ " " + info
                 print(info)
 
                 # Write training info to log
@@ -158,7 +173,11 @@ def run():
                                                             'train/cls_loss' : cls_loss.item(),
                                                             'train/cls_pos_loss' : cls_pos_loss_rec.item(),
                                                             'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
+            
 
+          
+            
+            
             # Summarize validation info
             if counter % args.summary_val_interval == 0:
                 print('summary_val_interval now')
@@ -167,6 +186,7 @@ def run():
                     model.train(False)  # Validation mode
 
                     val_data = next(val_dataloader_iter)    # Sample one batch
+                    
 
                     # Forward pass for validation and prediction
                     probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
@@ -184,6 +204,18 @@ def run():
                         for (tag, img) in ret_summary:
                             img = img[0].transpose(2, 0, 1)
                             summary_writer.add_image(tag, img, global_counter)
+                            
+                            #Note:Ammar Yasir
+                            # log the graph of the model
+                            print(f'Printing data types for add_graph()')
+                            print(type(val_data))
+                            # val_data_tensor= torch.tensor([float(item) for item in val_data], dtype=torch.float)     
+                            # print(type(val_data_tensor))
+                            print(type(model.module))
+                            summary_writer.add_graph(model.module,val_data,True)
+                            summary_writer.flush()
+                            
+                            
                     except:
                         raise Exception('Prediction skipped due to an error!')
 
@@ -214,6 +246,7 @@ def run():
 
             with torch.no_grad():
                 for (i, val_data) in enumerate(val_dataloader):
+                    print('Validation data instance {}'.format(i))
 
                     # Forward pass for validation and prediction
                     probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
@@ -244,6 +277,8 @@ def run():
                             cv2.imwrite(front_img_path, front_image)
                             cv2.imwrite(bird_view_path, bird_view)
                             cv2.imwrite(heatmap_path, heatmap)
+                    
+                                        
 
             # Run evaluation code
             cmd_1 = './eval/KITTI/launch_test.sh'
@@ -255,6 +290,7 @@ def run():
 
     print('Train done with total epoch:{}, iter:{}'.format(tot_epoch, global_counter))
 
+    
     # Close TensorBoardX writer
     summary_writer.close()
 

@@ -14,7 +14,7 @@ from utils.utils import box3d_to_label
 from model.model import RPN3D
 from loader.kitti import KITTI as Dataset
 
-
+torch.cuda.empty_cache() 
 parser = argparse.ArgumentParser(description = 'training')
 
 parser.add_argument('--tag', type = str, default = 'default', help = 'log tag')
@@ -23,7 +23,14 @@ parser.add_argument('--vis', type = bool, default = True, help = 'set to True if
 
 parser.add_argument('--batch_size', type = int, default = 2, help = 'batch size')
 
-parser.add_argument('--resumed_model', type = str, default = '', help = 'if specified, load the specified model')
+#Note: Ammar
+# calling default==kitti_Car_best.pth.tar
+# parser.add_argument('--resumed_model', type = str, default = '', help = 'if specified, load the specified model')
+parser.add_argument('--resumed_model', type = str, default = 'kitti_Car_best.pth.tar', help = 'if specified, load the specified model')
+
+
+
+parser.add_argument('--workers', type = int, default = 4)
 
 
 args = parser.parse_args()
@@ -72,7 +79,16 @@ def run():
 
             # tags: (N)
             # ret_box3d_scores: (N, N'); (class, x, y, z, h, w, l, rz, score)
-            for tag, score in zip(tags, ret_box3d_scores):
+            for tag, score in zip(tags, ret_box3d_scores):             
+                ##Note 
+                # Ammarr getting error on tag==
+                if str(tag) == "002500":
+                    continue
+                
+                if (str(tag) == "002500"):
+                    print(f'tag is reached at: ',{tag})
+                     
+                          
                 output_path = os.path.join(args.output_path, 'data', tag + '.txt')
                 with open(output_path, 'w+') as f:
                     labels = box3d_to_label([score[:, 1:8]], [score[:, 0]], [score[:, -1]], coordinate = 'lidar')[0]
