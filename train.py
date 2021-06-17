@@ -60,7 +60,7 @@ def run():
 
     start_epoch = 0
     global_counter = 0
-    min_loss = sys.float_info.max
+    min_loss = sys.float_info.max 
     
     
 
@@ -110,8 +110,10 @@ def run():
     # train and validate
     tot_epoch = start_epoch
     for epoch in range(start_epoch, args.max_epoch):
+        
+        
         # Learning rate scheme
-        lr_sched.step()
+        # lr_sched.step()
 
         counter = 0
         batch_time = time.time()
@@ -129,8 +131,6 @@ def run():
             start_time = time.time()
 
 
-           
-
             #Note:Ammar Yasir
             optimizer.zero_grad()
 
@@ -144,8 +144,17 @@ def run():
 
             # Clip gradient
             clip_grad_norm_(model.parameters(), 5)
+             
 
             optimizer.step()
+            
+            
+             # Note: Ammaar
+            #   In PyTorch 1.1.0 and later, you should call them in the opposite order: 
+            #   `optimizer.step()` before `lr_scheduler.step()’
+            # Learning rate scheme
+            lr_sched.step()
+            
             
             #Note:Ammar, zero_grad() should be before called before optimizer.step
             # optimizer.zero_grad()
@@ -207,12 +216,12 @@ def run():
                             
                             #Note:Ammar Yasir
                             # log the graph of the model
-                            print(f'Printing data types for add_graph()')
-                            print(type(val_data))
+                            # print(f'Printing data types for add_graph()')
+                            # print(type(val_data))
                             # val_data_tensor= torch.tensor([float(item) for item in val_data], dtype=torch.float)     
                             # print(type(val_data_tensor))
-                            print(type(model.module))
-                            summary_writer.add_graph(model.module,val_data,True)
+                            # print(type(model.module))
+                            # summary_writer.add_graph(model.module,val_data,True)
                             summary_writer.flush()
                             
                             
