@@ -125,3 +125,47 @@ def build_input(voxel_dict_list):
     # return batch_size, feature, number, coordinate
 
     return batch_size, feature_list, number_list, coordinate_list
+
+
+class get_dummy_kitti_sample():
+    
+    def __init__(self):
+        self.__tag = 0
+        self.__labels=[]
+        self.__rgb=[]
+        self.__raw_lidar=[]
+        self.__vox_feature=[]
+        self.__vox_number = []
+        self.__vox_cooridnate =[]
+        
+        
+    def get_tag(self):
+        #['aug_001838_3_0_9589']
+        pass
+    
+    def get_labels(self):
+        [['Car 0.0000 0.0000 0.0000 492.0000 183.0000 586.0000 215.0000 1.4698 1.7399 4.2597 -3.3895 1.9535 35.1870 0.1403\n'
+  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n'
+  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n'
+  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n']]
+        pass
+    
+    # def get_rbg(self):
+    #     pass
+    # def get_raw_lidar(self):
+    #     pass
+    # def get_voxel_feature(self):
+    #     pass
+    # def get_voxel_number(self):
+    #     pass
+    
+    # def get_vox_coordinate(self):
+    #     [tensor([[  0,   0, 311,  32],
+    #     [  0,   0, 313,  32],
+    #     [  0,   0, 315,  31],
+    #     ...,
+    #     [  0,   9, 355,  22],
+    #     [  0,   9, 356,  21],
+    #     [  0,   9, 357,  21]])]
+        
+    

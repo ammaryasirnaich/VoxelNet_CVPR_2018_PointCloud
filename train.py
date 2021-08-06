@@ -21,8 +21,13 @@ from model.model import RPN3D
 from loader.kitti import KITTI as Dataset
 from loader.kitti import collate_fn
 from torchvision import transforms
+import numpy as np
 
 import pdb
+
+
+import torch.onnx
+from torch.autograd import Variable
 
 
 parser = argparse.ArgumentParser(description = 'training')
@@ -73,11 +78,11 @@ def run():
     val_dataloader = DataLoader(val_dataset, batch_size = args.batch_size, shuffle = False, collate_fn = collate_fn,
                                 num_workers = args.workers, pin_memory = False)
    
-    #Note: Ammaar 
-    val_dataloader_iter = iter(val_dataloader)
+    
 
     # Build model
     model = RPN3D(cfg.DETECT_OBJ, args.alpha, args.beta)
+       
 
     # Resume model if necessary
     
@@ -106,6 +111,106 @@ def run():
 
     # Init TensorBoardX writer
     summary_writer = SummaryWriter(log_dir)
+    
+    
+    # Creat TensorBoardX graph for the model
+    dummy_data = next(iter(train_dataloader))
+    dummy_tag = dummy_data[0]   # convert to tensor 
+    # dummy_tag = torch.from_numpy(np.array([12]))
+    
+    
+    dummy_labels = dummy_data[1] 
+    
+    _i = dummy_data[3]
+   
+    dummy_labels_convertion=[]
+    for i in range(0,dummy_labels.size):
+        temp_label = dummy_labels[0][i].split(' ')
+        temp_label[0]=1
+        temp_label = np.array(temp_label,dtype=float)
+        temp_label = torch.tensor(temp_label,dtype=torch.float).cuda()
+        dummy_labels_convertion.append(temp_label)
+        # dummy_labels_convertion.append((torch.from_numpy(temp_label)))
+            
+      
+    # dummy_vox_feature =  dummy_data[2] 
+    # dummy_vox_number = torch.from_numpy(dummy_data[3])
+    # dummy_vox_cooridnate =  dummy_data[4] 
+    # dummy_rgb = torch.from_numpy(dummy_data[5])  
+    # dummy_lidar =  torch.from_numpy(dummy_data[6]) 
+    
+
+    
+    dummy_tag = torch.tensor([201819], dtype=torch.int64).cuda()   # convert to tensor 
+    dummy_labels =  dummy_labels_convertion
+    dummy_vox_feature=[]
+    for i in range(len(dummy_data[2])):
+        dummy_vox_feature.append(torch.tensor(dummy_data[2][i]).cuda())
+        
+   
+    dummy_vox_number = torch.tensor(dummy_data[3],dtype=torch.int8).cuda()
+    
+    dummy_vox_cooridnate=[]
+    
+    for i in range(len(dummy_data[4])):
+        dummy_vox_cooridnate.append(torch.tensor( dummy_data[4][i]).cuda())
+    
+    # dummy_vox_cooridnate =  dummy_data[4]
+    dummy_rgb = dummy_data[5]
+    dummy_lidar =  dummy_data[6]
+   
+    
+    print(type(dummy_tag))
+    print(type(dummy_labels))
+    print(type(dummy_data[2])) # ndarry
+    print(type(dummy_vox_number))
+    
+    print(type(dummy_vox_cooridnate))
+   
+    print(type(dummy_rgb))
+    print(type(dummy_lidar))
+    
+    
+    
+    
+    # model_data = (Variable(dummy_tag), Variable(dummy_labels), Variable(dummy_vox_feature), Variable(dummy_vox_number),\
+    #         Variable(dummy_vox_cooridnate))  #, dummy_rgb, dummy_lidar
+    
+    # torch.tensor(dummy_tag, device='cuda'),torch.tensor(dummy_labels, device='cuda'),\
+    
+     
+    _data_ = [dummy_tag, dummy_labels, dummy_vox_feature, dummy_vox_number,\
+            dummy_vox_cooridnate] 
+    
+    # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
+    
+    print(type(_data_))
+    
+   
+    # print(type(dummy_data))
+    
+  
+      
+    
+    with SummaryWriter(comment='VoxelNet') as w:
+        w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, dummy_vox_number,\
+            dummy_vox_cooridnate] , verbose=False)
+        # w.add_graph(model, [dummy_data[0], dummy_data[1], dummy_data[2], dummy_data[3],\
+        #     dummy_data[4]] , verbose=False)
+
+    print("function completed")
+    print("VoxelNet added into the graph")
+    
+    # input_names = [ "actual_input_1" ] + [ "learned_%d" % i for i in range(16) ]
+    # output_names = [ "output1" ]
+    
+    # torch.onnx.export(model.module, _data_, "voxelnet.onnx", export_params = True,verbose=True,input_names=input_names, output_names=output_names)
+    # print("function completed")
+    # print("VoxelNet added into the graph")
+    
+    
+    
+    
 
     # train and validate
     tot_epoch = start_epoch
@@ -122,7 +227,9 @@ def run():
         tot_val_times = 0
 
         for (i, data) in enumerate(train_dataloader):
-
+            print(type(data))
+            
+      
             model.train(True)   # Training mode
 
             counter += 1
@@ -136,8 +243,12 @@ def run():
 
 
             # Forward pass for training
+            # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
+
             _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
 
+
+            # 
             forward_time = time.time() - start_time
 
             loss.backward()
@@ -183,8 +294,6 @@ def run():
                                                             'train/cls_pos_loss' : cls_pos_loss_rec.item(),
                                                             'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
             
-
-          
             
             
             # Summarize validation info
@@ -196,9 +305,12 @@ def run():
 
                     val_data = next(val_dataloader_iter)    # Sample one batch
                     
-
+                
                     # Forward pass for validation and prediction
                     probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+                    
+                    # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( (val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]))
+
 
                     summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
                                                                 'validate/reg_loss': reg_loss.item(),

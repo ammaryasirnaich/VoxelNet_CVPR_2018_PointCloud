@@ -121,13 +121,19 @@ class MiddleAndRPN(nn.Module):
 
 
     def forward(self, inputs):
-
+      
         batch_size, DEPTH, HEIGHT, WIDTH, C = inputs.shape  # [batch_size, 10, 400/200, 352/240, 128]
 
         inputs = inputs.permute(0, 4, 1, 2, 3)  # (B, D, H, W, C) -> (B, C, D, H, W)
 
         temp_conv = self.middle_layer(inputs)   # [batch, 64, 2, 400, 352]
-        temp_conv = temp_conv.view(batch_size, -1, HEIGHT, WIDTH)   # [batch, 128, 400, 352]
+        
+        #Note:Ammar
+        # .view function was working fine with pytorch < 1.9.0 
+        # In pytorch 1.9.0 version, suggestion is to use .reshape method instead of .view       
+        # temp_conv = temp_conv.view(batch_size, -1, HEIGHT, WIDTH)   # [batch, 128, 400, 352]
+
+        temp_conv = temp_conv.reshape(batch_size, -1, HEIGHT, WIDTH)   # [batch, 128, 400, 352]
 
         temp_conv = self.block1(temp_conv)      # [batch, 128, 200, 176]
         temp_deconv1 = self.deconv1(temp_conv)
