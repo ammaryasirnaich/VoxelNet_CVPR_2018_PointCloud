@@ -34,20 +34,20 @@ class RPN3D(nn.Module):
         self.rpn_output_shape = self.rpn.output_shape
 
 
-    def forward(self,data):
+    def forward(self,_tag,_label,_vox_feature,_vox_number,_vox_coordinate):
         # _tag,_label,_vox_feature,_vox_number,_vox_coordinate
 
-        # tag = _tag
-        # label = _label
-        # vox_feature = _vox_feature
-        # vox_number = _vox_number
-        # vox_coordinate = _vox_coordinate
+        tag = _tag
+        label = _label
+        vox_feature = _vox_feature
+        vox_number = _vox_number
+        vox_coordinate = _vox_coordinate
         
-        tag = data[0]
-        label = data[1]
-        vox_feature = data[2]
-        vox_number = data[3]
-        vox_coordinate = data[4]
+        # tag = data[0]
+        # label = data[1]
+        # vox_feature = data[2]
+        # vox_number = data[3]
+        # vox_coordinate = data[4]
 
         features = self.feature(vox_feature, vox_number, vox_coordinate)
         prob_output, delta_output = self.rpn(features)

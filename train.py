@@ -115,49 +115,48 @@ def run():
     
     # Creat TensorBoardX graph for the model
     dummy_data = next(iter(train_dataloader))
-    dummy_tag = dummy_data[0]   # convert to tensor 
-    # dummy_tag = torch.from_numpy(np.array([12]))
+    # dummy_tag = dummy_data[0]   # convert to tensor 
+    dummy_tag = torch.from_numpy(np.array([12]))
     
     
     dummy_labels = dummy_data[1] 
     
-    _i = dummy_data[3]
    
     dummy_labels_convertion=[]
     for i in range(0,dummy_labels.size):
         temp_label = dummy_labels[0][i].split(' ')
         temp_label[0]=1
         temp_label = np.array(temp_label,dtype=float)
-        temp_label = torch.tensor(temp_label,dtype=torch.float).cuda()
-        dummy_labels_convertion.append(temp_label)
-        # dummy_labels_convertion.append((torch.from_numpy(temp_label)))
+        # temp_label = torch.tensor(temp_label,dtype=torch.float).cuda()
+        # dummy_labels_convertion.append(temp_label)
+        dummy_labels_convertion.append((torch.from_numpy(temp_label)))
             
       
-    # dummy_vox_feature =  dummy_data[2] 
-    # dummy_vox_number = torch.from_numpy(dummy_data[3])
-    # dummy_vox_cooridnate =  dummy_data[4] 
-    # dummy_rgb = torch.from_numpy(dummy_data[5])  
-    # dummy_lidar =  torch.from_numpy(dummy_data[6]) 
+    dummy_vox_feature =  dummy_data[2] 
+    dummy_vox_number = torch.from_numpy(dummy_data[3])
+    dummy_vox_cooridnate =  dummy_data[4] 
+    dummy_rgb = torch.from_numpy(dummy_data[5])  
+    dummy_lidar =  torch.from_numpy(dummy_data[6]) 
     
 
     
-    dummy_tag = torch.tensor([201819], dtype=torch.int64).cuda()   # convert to tensor 
-    dummy_labels =  dummy_labels_convertion
-    dummy_vox_feature=[]
-    for i in range(len(dummy_data[2])):
-        dummy_vox_feature.append(torch.tensor(dummy_data[2][i]).cuda())
+    # dummy_tag = torch.tensor([201819], dtype=torch.int64).cuda()   # convert to tensor 
+    # dummy_labels =  dummy_labels_convertion
+    # dummy_vox_feature=[]
+    # for i in range(len(dummy_data[2])):
+    #     dummy_vox_feature.append(torch.tensor(dummy_data[2][i]).cuda())
         
    
-    dummy_vox_number = torch.tensor(dummy_data[3],dtype=torch.int8).cuda()
+    # dummy_vox_number = torch.tensor(dummy_data[3],dtype=torch.int8).cuda()
     
-    dummy_vox_cooridnate=[]
+    # dummy_vox_cooridnate=[]
     
-    for i in range(len(dummy_data[4])):
-        dummy_vox_cooridnate.append(torch.tensor( dummy_data[4][i]).cuda())
+    # for i in range(len(dummy_data[4])):
+    #     dummy_vox_cooridnate.append(torch.tensor( dummy_data[4][i]).cuda())
     
-    # dummy_vox_cooridnate =  dummy_data[4]
-    dummy_rgb = dummy_data[5]
-    dummy_lidar =  dummy_data[6]
+    # # dummy_vox_cooridnate =  dummy_data[4]
+    # dummy_rgb = dummy_data[5]
+    # dummy_lidar =  dummy_data[6]
    
     
     print(type(dummy_tag))
@@ -243,9 +242,9 @@ def run():
 
 
             # Forward pass for training
-            # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
+            _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
 
-            _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
+            # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
 
 
             # 
@@ -307,9 +306,9 @@ def run():
                     
                 
                     # Forward pass for validation and prediction
-                    probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+                    # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
                     
-                    # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( (val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]))
+                    probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( (val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]))
 
 
                     summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
