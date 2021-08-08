@@ -647,9 +647,9 @@ def cal_rpn_target(labels, feature_map_shape, anchors, cls = 'Car', coordinate =
         
    
     # labels = labels.numpy()
-    print(type(labels))
-    print(labels.shape)
-    print(labels)
+    # print(type(labels))
+    # print(labels.shape)
+    # print(labels)
     
     batch_size = labels.shape[0]
     batch_gt_boxes3d = label_to_gt_box3d(labels, cls = cls, coordinate = coordinate)

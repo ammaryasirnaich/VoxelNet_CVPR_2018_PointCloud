@@ -13,7 +13,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader as DataLoader
 from torch.nn.utils import clip_grad_norm_
 
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from config import cfg
 from utils.utils import box3d_to_label
@@ -110,15 +111,13 @@ def run():
     log = open(os.path.join(args.log_root, args.log_name), 'a')
 
     # Init TensorBoardX writer
-    summary_writer = SummaryWriter(log_dir)
-    
+    # print(log_dir)
+    # summary_writer = SummaryWriter(log_dir)
+    summary_writer = SummaryWriter()
     
     # Creat TensorBoardX graph for the model
     dummy_data = next(iter(train_dataloader))
-    # dummy_tag = dummy_data[0]   # convert to tensor 
     dummy_tag = torch.from_numpy(np.array([12]))
-    
-    
     dummy_labels = dummy_data[1] 
     
    
@@ -127,8 +126,6 @@ def run():
         temp_label = dummy_labels[0][i].split(' ')
         temp_label[0]=1
         temp_label = np.array(temp_label,dtype=float)
-        # temp_label = torch.tensor(temp_label,dtype=torch.float).cuda()
-        # dummy_labels_convertion.append(temp_label)
         dummy_labels_convertion.append((torch.from_numpy(temp_label)))
             
       
@@ -159,15 +156,15 @@ def run():
     # dummy_lidar =  dummy_data[6]
    
     
-    print(type(dummy_tag))
-    print(type(dummy_labels))
-    print(type(dummy_data[2])) # ndarry
-    print(type(dummy_vox_number))
+    # print(type(dummy_tag))
+    # print(type(dummy_labels))
+    # print(type(dummy_data[2])) # ndarry
+    # print(type(dummy_vox_number))
     
-    print(type(dummy_vox_cooridnate))
+    # print(type(dummy_vox_cooridnate))
    
-    print(type(dummy_rgb))
-    print(type(dummy_lidar))
+    # print(type(dummy_rgb))
+    # print(type(dummy_lidar))
     
     
     
@@ -183,7 +180,7 @@ def run():
     
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
-    print(type(_data_))
+    # print(type(_data_))
     
    
     # print(type(dummy_data))
@@ -194,11 +191,13 @@ def run():
     with SummaryWriter(comment='VoxelNet') as w:
         w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, dummy_vox_number,\
             dummy_vox_cooridnate] , verbose=False)
+        w.close()
         # w.add_graph(model, [dummy_data[0], dummy_data[1], dummy_data[2], dummy_data[3],\
         #     dummy_data[4]] , verbose=False)
 
     print("function completed")
     print("VoxelNet added into the graph")
+    
     
     # input_names = [ "actual_input_1" ] + [ "learned_%d" % i for i in range(16) ]
     # output_names = [ "output1" ]
