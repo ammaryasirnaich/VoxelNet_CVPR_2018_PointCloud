@@ -11,10 +11,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader as DataLoader
+import torch.backends.cudnn as cudnn
+
 from torch.nn.utils import clip_grad_norm_
 
 # from tensorboardX import SummaryWriter
 from torch.utils.tensorboard import SummaryWriter
+
+import torch.profiler
 
 from config import cfg
 from utils.utils import box3d_to_label
@@ -79,6 +83,7 @@ def run():
     val_dataloader = DataLoader(val_dataset, batch_size = args.batch_size, shuffle = False, collate_fn = collate_fn,
                                 num_workers = args.workers, pin_memory = False)
    
+    val_dataloader_iter = iter(val_dataloader)
     
 
     # Build model
@@ -101,6 +106,10 @@ def run():
             print(("=> No checkpoint found at '{}'".format(args.resumed_model)))
 
     model = nn.DataParallel(model).cuda()
+    
+    # enable the inbuilt cudnn auto-tuner to find the best algorithm to use for your hardware.
+    cudnn.benchmark = True
+    
 
     # Optimization scheme
     optimizer = optim.Adam(model.parameters(), lr = args.lr)
@@ -205,209 +214,221 @@ def run():
     # torch.onnx.export(model.module, _data_, "voxelnet.onnx", export_params = True,verbose=True,input_names=input_names, output_names=output_names)
     # print("function completed")
     # print("VoxelNet added into the graph")
-    
-    
-    
-    
-
+        
+    with torch.profiler.profile(
+        activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA],
+        schedule=torch.profiler.schedule(
+            wait=1,
+            warmup=1,
+            active=2),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('./result', worker_name='worker0'),
+        record_shapes=True,
+        profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
+        with_stack=True
+    ) as p: 
+        
     # train and validate
-    tot_epoch = start_epoch
-    for epoch in range(start_epoch, args.max_epoch):
-        
-        
-        # Learning rate scheme
-        # lr_sched.step()
-
-        counter = 0
-        batch_time = time.time()
-
-        tot_val_loss = 0
-        tot_val_times = 0
-
-        for (i, data) in enumerate(train_dataloader):
-            print(type(data))
-            
-      
-            model.train(True)   # Training mode
-
-            counter += 1
-            global_counter += 1
-
-            start_time = time.time()
-
-
-            #Note:Ammar Yasir
-            optimizer.zero_grad()
-
-
-            # Forward pass for training
-            _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
-
-            # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
-
-
-            # 
-            forward_time = time.time() - start_time
-
-            loss.backward()
-
-            # Clip gradient
-            clip_grad_norm_(model.parameters(), 5)
-             
-
-            optimizer.step()
+        tot_epoch = start_epoch
+        for epoch in range(start_epoch, args.max_epoch):
             
             
-             # Note: Ammaar
-            #   In PyTorch 1.1.0 and later, you should call them in the opposite order: 
-            #   `optimizer.step()` before `lr_scheduler.step()’
             # Learning rate scheme
-            lr_sched.step()
-            
-            
-            #Note:Ammar, zero_grad() should be before called before optimizer.step
-            # optimizer.zero_grad()
+            # lr_sched.step()
 
-            batch_time = time.time() - batch_time
-
-            if counter % args.print_freq == 0:
-                # Print training info
-                info = 'Train: {} @ epoch:{}/{} loss: {:.4f} reg_loss: {:.4f} cls_loss: {:.4f} cls_pos_loss: {:.4f} ' \
-                       'cls_neg_loss: {:.4f} forward time: {:.4f} batch time: {:.4f}'.format(
-                    counter, epoch + 1, args.max_epoch, loss.item(), reg_loss.item(), cls_loss.item(), cls_pos_loss_rec.item(),
-                    cls_neg_loss_rec.item(), forward_time, batch_time)
-                info = '{}\t'.format(time.asctime(time.localtime())) +"Data instance {}".format(i)+ " " + info
-                print(info)
-
-                # Write training info to log
-                log.write(info + '\n')
-                log.flush()
-
-            # Summarize training info
-            if counter % args.summary_interval == 0:
-                print("summary_interval now")
-                summary_writer.add_scalars(str(epoch + 1), {'train/loss' : loss.item(),
-                                                            'train/reg_loss' : reg_loss.item(),
-                                                            'train/cls_loss' : cls_loss.item(),
-                                                            'train/cls_pos_loss' : cls_pos_loss_rec.item(),
-                                                            'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
-            
-            
-            
-            # Summarize validation info
-            if counter % args.summary_val_interval == 0:
-                print('summary_val_interval now')
-
-                with torch.no_grad():
-                    model.train(False)  # Validation mode
-
-                    val_data = next(val_dataloader_iter)    # Sample one batch
-                    
-                
-                    # Forward pass for validation and prediction
-                    # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
-                    
-                    probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( (val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]))
-
-
-                    summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
-                                                                'validate/reg_loss': reg_loss.item(),
-                                                                'validate/cls_loss': cls_loss.item(),
-                                                                'validate/cls_pos_loss': cls_pos_loss_rec.item(),
-                                                                'validate/cls_neg_loss': cls_neg_loss_rec.item()}, global_counter)
-
-                    try:
-                        # Prediction
-                        tags, ret_box3d_scores, ret_summary = model.module.predict(val_data, probs, deltas, summary = True)
-
-                        for (tag, img) in ret_summary:
-                            img = img[0].transpose(2, 0, 1)
-                            summary_writer.add_image(tag, img, global_counter)
-                            
-                            #Note:Ammar Yasir
-                            # log the graph of the model
-                            # print(f'Printing data types for add_graph()')
-                            # print(type(val_data))
-                            # val_data_tensor= torch.tensor([float(item) for item in val_data], dtype=torch.float)     
-                            # print(type(val_data_tensor))
-                            # print(type(model.module))
-                            # summary_writer.add_graph(model.module,val_data,True)
-                            summary_writer.flush()
-                            
-                            
-                    except:
-                        raise Exception('Prediction skipped due to an error!')
-
-                    # Add sampled data loss
-                    tot_val_loss += val_loss.item()
-                    tot_val_times += 1
-
+            counter = 0
             batch_time = time.time()
 
-        # Save the best model
-        avg_val_loss = tot_val_loss / float(tot_val_times)
-        is_best = avg_val_loss < min_loss
-        min_loss = min(avg_val_loss, min_loss)
-        save_checkpoint({'epoch': epoch + 1, 'global_counter': global_counter, 'state_dict': model.module.state_dict(), 'min_loss': min_loss},
-                        is_best, args.saved_model.format(cfg.DETECT_OBJ))
+            tot_val_loss = 0
+            tot_val_times = 0
 
-        # Dump test data every 10 epochs
-        if (epoch + 1) % args.val_epoch == 0:   # Time consuming
-            # Create output folder
-            os.makedirs(os.path.join(args.output_path, str(epoch + 1)), exist_ok = True)
-            os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'data'), exist_ok = True)
-            os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'log'), exist_ok=True)
+            for (i, data) in enumerate(train_dataloader):
+               
+                model.train(True)   # Training mode
 
-            if args.vis:
-                os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'vis'), exist_ok = True)
+                counter += 1
+                global_counter += 1
 
-            model.train(False)  # Validation mode
+                start_time = time.time()
 
-            with torch.no_grad():
-                for (i, val_data) in enumerate(val_dataloader):
-                    print('Validation data instance {}'.format(i))
 
-                    # Forward pass for validation and prediction
-                    probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+                #Note:Ammar Yasir
+                optimizer.zero_grad()
 
-                    front_images, bird_views, heatmaps = None, None, None
-                    if args.vis:
-                        tags, ret_box3d_scores, front_images, bird_views, heatmaps = \
-                            model.module.predict(val_data, probs, deltas, summary = False, vis = True)
-                    else:
-                        tags, ret_box3d_scores = model.module.predict(val_data, probs, deltas, summary = False, vis = False)
 
-                    # tags: (N)
-                    # ret_box3d_scores: (N, N'); (class, x, y, z, h, w, l, rz, score)
-                    for tag, score in zip(tags, ret_box3d_scores):
-                        output_path = os.path.join(args.output_path, str(epoch + 1), 'data', tag + '.txt')
-                        with open(output_path, 'w+') as f:
-                            labels = box3d_to_label([score[:, 1:8]], [score[:, 0]], [score[:, -1]], coordinate = 'lidar')[0]
-                            for line in labels:
-                                f.write(line)
-                            print('Write out {} objects to {}'.format(len(labels), tag))
+                # Forward pass for training
+                _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
 
-                    # Dump visualizations
-                    if args.vis:
-                        for tag, front_image, bird_view, heatmap in zip(tags, front_images, bird_views, heatmaps):
-                            front_img_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_front.jpg')
-                            bird_view_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_bv.jpg')
-                            heatmap_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_heatmap.jpg')
-                            cv2.imwrite(front_img_path, front_image)
-                            cv2.imwrite(bird_view_path, bird_view)
-                            cv2.imwrite(heatmap_path, heatmap)
+                # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
+
+
+                # 
+                forward_time = time.time() - start_time
+
+                loss.backward()
+
+                # Clip gradient
+                clip_grad_norm_(model.parameters(), 5)
+                
+
+                optimizer.step()
+                
+                
+                # Note: Ammaar
+                #   In PyTorch 1.1.0 and later, you should call them in the opposite order: 
+                #   `optimizer.step()` before `lr_scheduler.step()’
+                # Learning rate scheme
+                lr_sched.step()
+                
+                
+                #Note:Ammar, zero_grad() should be before called before optimizer.step
+                # optimizer.zero_grad()
+
+                batch_time = time.time() - batch_time
+
+                if counter % args.print_freq == 0:
+                    # Print training info
+                    info = 'Train: {} @ epoch:{}/{} loss: {:.4f} reg_loss: {:.4f} cls_loss: {:.4f} cls_pos_loss: {:.4f} ' \
+                        'cls_neg_loss: {:.4f} forward time: {:.4f} batch time: {:.4f}'.format(
+                        counter, epoch + 1, args.max_epoch, loss.item(), reg_loss.item(), cls_loss.item(), cls_pos_loss_rec.item(),
+                        cls_neg_loss_rec.item(), forward_time, batch_time)
+                    info = '{}\t'.format(time.asctime(time.localtime())) +"Data instance {}".format(i)+ " " + info
+                    print(info)
+
+                    # Write training info to log
+                    log.write(info + '\n')
+                    log.flush()
+
+                # Summarize training info
+                if counter % args.summary_interval == 0:
+                    print("summary_interval now")
+                    summary_writer.add_scalars(str(epoch + 1), {'train/loss' : loss.item(),
+                                                                'train/reg_loss' : reg_loss.item(),
+                                                                'train/cls_loss' : cls_loss.item(),
+                                                                'train/cls_pos_loss' : cls_pos_loss_rec.item(),
+                                                                'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
+                
+                
+                
+                # Summarize validation info
+                if counter % args.summary_val_interval == 0:
+                    print('summary_val_interval now')
+
+                    with torch.no_grad():
+                        model.train(False)  # Validation mode
+
+                        val_data = next(val_dataloader_iter)    # Sample one batch
+                        
                     
-                                        
+                        # Forward pass for validation and prediction
+                        # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+                        
+                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[3],val_data[4])
 
-            # Run evaluation code
-            cmd_1 = './eval/KITTI/launch_test.sh'
-            cmd_2 = os.path.join(args.output_path, str(epoch + 1))
-            cmd_3 = os.path.join(args.output_path, str(epoch + 1), 'log')
-            os.system(' '.join([cmd_1, cmd_2, cmd_3]))
 
-        tot_epoch = epoch + 1
+                        summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
+                                                                    'validate/reg_loss': reg_loss.item(),
+                                                                    'validate/cls_loss': cls_loss.item(),
+                                                                    'validate/cls_pos_loss': cls_pos_loss_rec.item(),
+                                                                    'validate/cls_neg_loss': cls_neg_loss_rec.item()}, global_counter)
 
-    print('Train done with total epoch:{}, iter:{}'.format(tot_epoch, global_counter))
+                        try:
+                            # Prediction
+                            tags, ret_box3d_scores, ret_summary = model.module.predict(val_data, probs, deltas, summary = True)
+
+                            for (tag, img) in ret_summary:
+                                img = img[0].transpose(2, 0, 1)
+                                summary_writer.add_image(tag, img, global_counter)
+                                
+                                #Note:Ammar Yasir
+                                # log the graph of the model
+                                # print(f'Printing data types for add_graph()')
+                                # print(type(val_data))
+                                # val_data_tensor= torch.tensor([float(item) for item in val_data], dtype=torch.float)     
+                                # print(type(val_data_tensor))
+                                # print(type(model.module))
+                                # summary_writer.add_graph(model.module,val_data,True)
+                                summary_writer.flush()
+                                
+                                
+                        except:
+                            raise Exception('Prediction skipped due to an error!')
+
+                        # Add sampled data loss
+                        tot_val_loss += val_loss.item()
+                        tot_val_times += 1
+
+                batch_time = time.time()
+            
+            
+            #  Need to call this at the end of each step to notify profiler of steps' boundary. 
+            p.step() 
+            
+            # Save the best model
+            avg_val_loss = tot_val_loss / float(tot_val_times)
+            is_best = avg_val_loss < min_loss
+            min_loss = min(avg_val_loss, min_loss)
+            save_checkpoint({'epoch': epoch + 1, 'global_counter': global_counter, 'state_dict': model.module.state_dict(), 'min_loss': min_loss},
+                            is_best, args.saved_model.format(cfg.DETECT_OBJ))
+
+            # Dump test data every 10 epochs
+            if (epoch + 1) % args.val_epoch == 0:   # Time consuming
+                # Create output folder
+                os.makedirs(os.path.join(args.output_path, str(epoch + 1)), exist_ok = True)
+                os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'data'), exist_ok = True)
+                os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'log'), exist_ok=True)
+
+                if args.vis:
+                    os.makedirs(os.path.join(args.output_path, str(epoch + 1), 'vis'), exist_ok = True)
+
+                model.train(False)  # Validation mode
+
+                with torch.no_grad():
+                    for (i, val_data) in enumerate(val_dataloader):
+                        print('Validation data instance {}'.format(i))
+
+                        # Forward pass for validation and prediction
+                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+
+                        front_images, bird_views, heatmaps = None, None, None
+                        if args.vis:
+                            tags, ret_box3d_scores, front_images, bird_views, heatmaps = \
+                                model.module.predict(val_data, probs, deltas, summary = False, vis = True)
+                        else:
+                            tags, ret_box3d_scores = model.module.predict(val_data, probs, deltas, summary = False, vis = False)
+
+                        # tags: (N)
+                        # ret_box3d_scores: (N, N'); (class, x, y, z, h, w, l, rz, score)
+                        for tag, score in zip(tags, ret_box3d_scores):
+                            output_path = os.path.join(args.output_path, str(epoch + 1), 'data', tag + '.txt')
+                            with open(output_path, 'w+') as f:
+                                labels = box3d_to_label([score[:, 1:8]], [score[:, 0]], [score[:, -1]], coordinate = 'lidar')[0]
+                                for line in labels:
+                                    f.write(line)
+                                print('Write out {} objects to {}'.format(len(labels), tag))
+
+                        # Dump visualizations
+                        if args.vis:
+                            for tag, front_image, bird_view, heatmap in zip(tags, front_images, bird_views, heatmaps):
+                                front_img_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_front.jpg')
+                                bird_view_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_bv.jpg')
+                                heatmap_path = os.path.join(args.output_path, str(epoch + 1), 'vis', tag + '_heatmap.jpg')
+                                cv2.imwrite(front_img_path, front_image)
+                                cv2.imwrite(bird_view_path, bird_view)
+                                cv2.imwrite(heatmap_path, heatmap)
+                        
+                                            
+
+                # Run evaluation code
+                cmd_1 = './eval/KITTI/launch_test.sh'
+                cmd_2 = os.path.join(args.output_path, str(epoch + 1))
+                cmd_3 = os.path.join(args.output_path, str(epoch + 1), 'log')
+                os.system(' '.join([cmd_1, cmd_2, cmd_3]))
+
+            tot_epoch = epoch + 1
+
+        print('Train done with total epoch:{}, iter:{}'.format(tot_epoch, global_counter))
 
     
     # Close TensorBoardX writer
