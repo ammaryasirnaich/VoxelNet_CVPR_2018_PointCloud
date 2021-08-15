@@ -49,7 +49,7 @@ class FeatureNet(nn.Module):
         self.vfe2 = VFELayer(32, 128)
 
 
-    def forward(self, feature, number, coordinate):
+    def forward(self, feature, coordinate):
 
         batch_size = len(feature)
 

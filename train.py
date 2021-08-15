@@ -183,22 +183,17 @@ def run():
     
     # torch.tensor(dummy_tag, device='cuda'),torch.tensor(dummy_labels, device='cuda'),\
     
-     
-    _data_ = [dummy_tag, dummy_labels, dummy_vox_feature, dummy_vox_number,\
-            dummy_vox_cooridnate] 
     
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
-    # print(type(_data_))
-    
-   
+    # print(type(_data_)
     # print(type(dummy_data))
     
   
       
     
     with SummaryWriter(comment='VoxelNet') as w:
-        w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, dummy_vox_number,\
+        w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, \
             dummy_vox_cooridnate] , verbose=False)
         w.close()
         # w.add_graph(model, [dummy_data[0], dummy_data[1], dummy_data[2], dummy_data[3],\
@@ -227,7 +222,7 @@ def run():
         record_shapes=True,
         profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
         with_stack=True
-    ) as p: 
+    ) as prof: 
         
     # train and validate
         tot_epoch = start_epoch
@@ -244,6 +239,8 @@ def run():
             tot_val_times = 0
 
             for (i, data) in enumerate(train_dataloader):
+                if i >= (10) * 2: # for testing  break after 10 iterations
+                    break
                
                 model.train(True)   # Training mode
 
@@ -252,16 +249,13 @@ def run():
 
                 start_time = time.time()
 
-
-                #Note:Ammar Yasir
-                optimizer.zero_grad()
-
-
                 # Forward pass for training
-                _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[3],data[4])
+                _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[4])
 
                 # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
 
+                  #Note:Ammar Yasir
+                optimizer.zero_grad()
 
                 # 
                 forward_time = time.time() - start_time
@@ -286,6 +280,13 @@ def run():
                 # optimizer.zero_grad()
 
                 batch_time = time.time() - batch_time
+                
+                
+                #  Need to call this at the end of each step to notify profiler of steps' boundary. 
+                prof.step() 
+                
+                
+                
 
                 if counter % args.print_freq == 0:
                     # Print training info
@@ -324,7 +325,7 @@ def run():
                         # Forward pass for validation and prediction
                         # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
                         
-                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[3],val_data[4])
+                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[4])
 
 
                         summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
@@ -362,8 +363,6 @@ def run():
                 batch_time = time.time()
             
             
-            #  Need to call this at the end of each step to notify profiler of steps' boundary. 
-            p.step() 
             
             # Save the best model
             avg_val_loss = tot_val_loss / float(tot_val_times)
@@ -389,7 +388,7 @@ def run():
                         print('Validation data instance {}'.format(i))
 
                         # Forward pass for validation and prediction
-                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
 
                         front_images, bird_views, heatmaps = None, None, None
                         if args.vis:
