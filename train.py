@@ -114,7 +114,8 @@ def run():
     # Optimization scheme
     optimizer = optim.Adam(model.parameters(), lr = args.lr)
 
-    lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, [150])
+    #lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, [150])
+    lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50,80], gamma=0.1)
 
     # Init file log
     log = open(os.path.join(args.log_root, args.log_name), 'a')
@@ -228,9 +229,6 @@ def run():
         tot_epoch = start_epoch
         for epoch in range(start_epoch, args.max_epoch):
             
-            
-            # Learning rate scheme
-            # lr_sched.step()
 
             counter = 0
             batch_time = time.time()
@@ -239,8 +237,6 @@ def run():
             tot_val_times = 0
 
             for (i, data) in enumerate(train_dataloader):
-                if i >= (10) * 2: # for testing  break after 10 iterations
-                    break
                
                 model.train(True)   # Training mode
 
@@ -283,7 +279,7 @@ def run():
                 
                 
                 #  Need to call this at the end of each step to notify profiler of steps' boundary. 
-                prof.step() 
+                #prof.step() 
                 
                 
                 

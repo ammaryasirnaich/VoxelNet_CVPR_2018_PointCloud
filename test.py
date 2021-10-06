@@ -68,8 +68,8 @@ def run():
         for (i, val_data) in enumerate(val_dataloader):
 
             # Forward pass for validation and prediction
-            probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
-
+            # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+            probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
             front_images, bird_views, heatmaps = None, None, None
             if args.vis:
                 tags, ret_box3d_scores, front_images, bird_views, heatmaps = \

@@ -5,9 +5,9 @@ Thanks to [@qianguih](https://github.com/qianguih).
 
 
 # Dependencies
-- `python3.5+`
-- `Pytorch` (tested on 0.4.1)
-- `TensorBoardX` (tested on 1.4)
+- `python 3.8.10+`
+- `Pytorch` (tested on 1.9.0+cu111)
+- `TensorBoard` (tested on 1.9.0+cu111)
 - `OpenCV`
 - `Pillow` (for add_image in TensorBoardX)
 - `Boost` (for compiling evaluation code)
