@@ -115,7 +115,7 @@ def run():
     optimizer = optim.Adam(model.parameters(), lr = args.lr)
 
     #lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, [150])
-    lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50,80], gamma=0.1)
+    lr_sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,20], gamma=0.1)
 
     # Init file log
     log = open(os.path.join(args.log_root, args.log_name), 'a')

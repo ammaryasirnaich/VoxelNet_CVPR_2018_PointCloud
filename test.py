@@ -25,8 +25,7 @@ parser.add_argument('--batch_size', type = int, default = 2, help = 'batch size'
 
 #Note: Ammar
 # calling default==kitti_Car_best.pth.tar
-# parser.add_argument('--resumed_model', type = str, default = '', help = 'if specified, load the specified model')
-parser.add_argument('--resumed_model', type = str, default = 'kitti_Car_best.pth.tar', help = 'if specified, load the specified model')
+parser.add_argument('--resumed_model', type = str, default = '', help = 'if specified, load the specified model')
 
 
 
@@ -69,6 +68,8 @@ def run():
 
             # Forward pass for validation and prediction
             # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
+ 
+ 
             probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
             front_images, bird_views, heatmaps = None, None, None
             if args.vis:
@@ -77,16 +78,20 @@ def run():
             else:
                 tags, ret_box3d_scores = model.module.predict(val_data, probs, deltas, summary = False, vis = False)
 
+
+
+
+
             # tags: (N)
             # ret_box3d_scores: (N, N'); (class, x, y, z, h, w, l, rz, score)
             for tag, score in zip(tags, ret_box3d_scores):             
                 ##Note 
                 # Ammarr getting error on tag==
-                if str(tag) == "002500":
-                    continue
+                # if str(tag) == "002500":
+                #     continue
                 
-                if (str(tag) == "002500"):
-                    print(f'tag is reached at: ',{tag})
+                # if (str(tag) == "002500"):
+                #     print(f'tag is reached at: ',{tag})
                      
                           
                 output_path = os.path.join(args.output_path, 'data', tag + '.txt')
@@ -110,12 +115,15 @@ def run():
 if __name__ == '__main__':
     dataset_dir = cfg.DATA_DIR
     val_dir = os.path.join(cfg.DATA_DIR, 'validation')
-    save_model_dir = os.path.join('./saved', args.tag)
-
+    save_model_dir = os.path.join("/VoxelNet_CVPR_2018_PointCloud/saved/", args.tag)
+    
+ 
+    
     # Create output folder
     os.makedirs(args.output_path, exist_ok = True)
     os.makedirs(os.path.join(args.output_path, 'data'), exist_ok = True)
     if args.vis:
         os.makedirs(os.path.join(args.output_path, 'vis'), exist_ok =  True)
+        
 
     run()

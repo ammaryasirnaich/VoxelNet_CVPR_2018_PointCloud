@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Crooped gt dir
-GT_DIR=/data/MD_KITTI/validation/label_2
+#GT_DIR=/data/MD_KITTI/validation/label_2
+GT_DIR=/data/KITTI/validation/label_2
 # pred dir
 PRED_DIR=$1
 
