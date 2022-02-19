@@ -7,11 +7,58 @@
 # Last Modified : Thu 18 Jan 2018 05:34:42 PM CST
 # Created By : Jeasine Ma [jeasinema[at]gmail[dot]com]
 
-import numpy as np
 
+from voxel_generator import *
+
+
+import numpy as np
 from config import cfg
 
 data_dir = 'velodyne'
+
+def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
+    voxel_size = [2, 2, 4]
+    point_cloud_range = [0, -40, -3, 70.4, 40, 1]
+    max_num_points = 35
+    self = VoxelGenerator(voxel_size, point_cloud_range, max_num_points)
+    voxels = self.generate(point_cloud)
+    voxels, coors, num_points_per_voxel = voxels
+    
+    
+    voxel_index = coors
+    # [K, 3] coordinate buffer as described in the paper
+    coordinate_buffer = np.unique(voxel_index, axis = 0)
+
+    K = len(coordinate_buffer)
+    T = max_num_points
+
+    # [K, 1] store number of points in each voxel grid
+    number_buffer = np.zeros(shape = (K), dtype = np.int64)
+
+    # [K, T, 7] feature buffer as described in the paper
+    feature_buffer = np.zeros(shape = (K, T, 7), dtype = np.float32)
+
+    # build a reverse index for coordinate buffer
+    index_buffer = {}
+    for i in range(K):
+        index_buffer[tuple(coordinate_buffer[i])] = i
+
+    for voxel, point in zip(voxel_index, point_cloud):
+        index = index_buffer[tuple(voxel)]
+        number = number_buffer[index]
+        if number < T:
+            feature_buffer[index, number, :4] = point
+            number_buffer[index] += 1
+
+    feature_buffer[:, :, -3:] = feature_buffer[:, :, :3] - \
+        feature_buffer[:, :, :3].sum(axis = 1, keepdims = True)/number_buffer.reshape(K, 1, 1)
+
+    voxel_dict = {'feature_buffer': feature_buffer,
+                  'coordinate_buffer': coordinate_buffer,
+                  'number_buffer': number_buffer}
+
+    return voxel_dict
+
 
 def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
     # Input:
@@ -82,4 +129,9 @@ def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
                   'number_buffer': number_buffer}
 
     return voxel_dict
+
+
+
+
+
 
