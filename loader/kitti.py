@@ -11,6 +11,7 @@ import torch.utils.data as data_utl
 from config import cfg
 from utils.data_aug import aug_data
 from utils.preprocess import process_pointcloud
+from utils.preprocess import vfe_from_pointcloud
 
 import pdb
 
@@ -37,8 +38,13 @@ class Processor:
             else:
                 labels = ['']
             tag = self.data_tag[load_index]
+            
             voxel = process_pointcloud(raw_lidar)
-            ret = [tag, rgb, raw_lidar, voxel, labels]
+            
+            # voxel = vfe_from_pointcloud(raw_lidar)
+            
+            # ret = [tag, rgb, raw_lidar, voxel, labels, aug_voxel ]
+            ret = [tag, rgb, raw_lidar, voxel, labels ]
 
         return ret
 
@@ -89,10 +95,10 @@ def collate_fn(rets):
     raw_lidar = [ret[2] for ret in rets]
     voxel = [ret[3] for ret in rets]
     labels = [ret[4] for ret in rets]
-
+    
     # Only for voxel
     _, vox_feature, vox_number, vox_coordinate = build_input(voxel)
-
+    
     res = (
         np.array(tag),
         np.array(labels),
@@ -118,6 +124,7 @@ def build_input(voxel_dict_list):
         coordinate = voxel_dict['coordinate_buffer']        # (K, 3)
         coordinate_list.append(np.pad(coordinate, ((0, 0), (1, 0)), mode = 'constant', constant_values = i))
 
+    
     # feature = np.concatenate(feature_list)
     # number = np.concatenate(number_list)
     # coordinate = np.concatenate(coordinate_list)
@@ -139,33 +146,3 @@ class get_dummy_kitti_sample():
         self.__vox_cooridnate =[]
         
         
-    def get_tag(self):
-        #['aug_001838_3_0_9589']
-        pass
-    
-    def get_labels(self):
-        [['Car 0.0000 0.0000 0.0000 492.0000 183.0000 586.0000 215.0000 1.4698 1.7399 4.2597 -3.3895 1.9535 35.1870 0.1403\n'
-  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n'
-  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n'
-  'DontCare 0.0000 0.0000 0.0000 1562.0000 1016.0000 1564.0000 1018.0000 0.9999 1.0000 1.0000 -1130.8940 -997.4895 -852.0660 -0.4349\n']]
-        pass
-    
-    # def get_rbg(self):
-    #     pass
-    # def get_raw_lidar(self):
-    #     pass
-    # def get_voxel_feature(self):
-    #     pass
-    # def get_voxel_number(self):
-    #     pass
-    
-    # def get_vox_coordinate(self):
-    #     [tensor([[  0,   0, 311,  32],
-    #     [  0,   0, 313,  32],
-    #     [  0,   0, 315,  31],
-    #     ...,
-    #     [  0,   9, 355,  22],
-    #     [  0,   9, 356,  21],
-    #     [  0,   9, 357,  21]])]
-        
-    

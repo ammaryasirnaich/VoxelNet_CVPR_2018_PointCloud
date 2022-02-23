@@ -31,6 +31,8 @@ import numpy as np
 import pdb
 
 
+from utils import intensity_histogram
+
 import torch.onnx
 from torch.autograd import Variable
 
@@ -43,7 +45,7 @@ parser.add_argument('--beta', type = float, default = 1, help = 'beta in loss fu
 
 parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')  # default epoch was 1
 parser.add_argument('--batch_size', type = int, default = 1, help = 'batch size')
-parser.add_argument('--workers', type = int, default = 4)
+parser.add_argument('--workers', type = int, default = 1)  #4
 
 parser.add_argument('--summary_interval', type = int, default = 100, help = 'iter interval for training summary')
 parser.add_argument('--summary_val_interval', type = int, default = 200, help = 'iter interval for val summary')
@@ -84,6 +86,8 @@ def run():
                                 num_workers = args.workers, pin_memory = False)
    
     val_dataloader_iter = iter(val_dataloader)
+    
+    # feature = intensity_histogram.hist_test()
     
 
     # Build model
