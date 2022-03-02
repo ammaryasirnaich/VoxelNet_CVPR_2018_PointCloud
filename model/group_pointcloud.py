@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from zmq import device
 
 from config import cfg
 
@@ -57,8 +58,6 @@ class FeatureNet(nn.Module):
         batch_size = len(feature)
         
         # the feature is of list type 
-        # print("Feature dimensions before torch.cat", type(feature[0]))  
-        # print("Feature dimensions before torch.cat", feature[0].shape)
 
         feature = torch.cat(feature, dim = 0)   # [ΣK, cfg.VOXEL_POINT_COUNT, 7]; cfg.VOXEL_POINT_COUNT = 35/45
         coordinate = torch.cat(coordinate, dim = 0)     # [ΣK, 4]; each row stores (batch, d, h, w)
@@ -75,18 +74,12 @@ class FeatureNet(nn.Module):
   
          # [ΣK, 138]
         # Appending voxel intensity historgram feature 
-        
-        # print("Feature dimensions after torch.cat",feature.shape)
-        # print("voxelwise",voxelwise.shape)
-     
+
      
         temp_hist_feature = feature[:,:,3:4]
         # print("voxel Intensity values shape",temp_hist_feature.shape)
-        # hist_feature[:,:] = torch.histc(feature[:,:,1], bins=10, min=0, max=1) 
         
-        # print("Printing hist feature dimension",voxelwise.shape[0])
-        
-        final_feature = torch.zeros((voxelwise.shape[0],10))
+        final_feature = torch.zeros((voxelwise.shape[0],10)).cuda()
         for row in range(voxelwise.shape[0]):
             # print("element wise features",temp_hist_feature[row].shape)
             # print("input type", type(temp_hist_feature[row]))
@@ -94,29 +87,17 @@ class FeatureNet(nn.Module):
             # print(row,",hist values",hist)
             final_feature[row,:] = hist
 
-        print("voxelwise",voxelwise.shape)
-        print("final feature shape", final_feature.shape)
-        # print("final feature",final_feature)
+        # print("voxelwise",voxelwise.shape)
+        # print("final feature shape", final_feature.shape)
+        voxelwise = torch.cat((voxelwise,final_feature ),1)
         
-        if(voxelwise.is_cuda):
-            print("in cuda")
-        if(final_feature.is_cuda):
-            print("in cude") 
-        
-        final_voxelwise = torch.cat((voxelwise,final_feature ),1)
-        
-        print("final_voxelwise", final_voxelwise.shape)
-
         # print("[ΣK, 138]",hist_feature.shape)
 
         # Car: [B, 10, 400, 352, 128]; Pedestrain/Cyclist: [B, 10, 200, 240, 128]
         # outputs = torch.sparse.FloatTensor(coordinate.t(), voxelwise, torch.Size([batch_size, cfg.INPUT_DEPTH, cfg.INPUT_HEIGHT, cfg.INPUT_WIDTH, 128]))
 
-
-        # Car: [B, 10, 400, 352, 128]; Pedestrain/Cyclist: [B, 10, 200, 240, 138]
+        # Car: [B, 10, 400, 352, 128]; Pedestrain/Cyclist: [B, 10, 200, 240, 138]      
         outputs = torch.sparse.FloatTensor(coordinate.t(), voxelwise, torch.Size([batch_size, cfg.INPUT_DEPTH, cfg.INPUT_HEIGHT, cfg.INPUT_WIDTH, 138]))
-
-
 
         outputs = outputs.to_dense()
 
