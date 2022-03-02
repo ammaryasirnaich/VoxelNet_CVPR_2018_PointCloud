@@ -40,10 +40,7 @@ class Processor:
             tag = self.data_tag[load_index]
             
             voxel = process_pointcloud(raw_lidar)
-            
-            # voxel = vfe_from_pointcloud(raw_lidar)
-            
-            # ret = [tag, rgb, raw_lidar, voxel, labels, aug_voxel ]
+
             ret = [tag, rgb, raw_lidar, voxel, labels ]
 
         return ret

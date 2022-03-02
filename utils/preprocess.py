@@ -3,33 +3,51 @@
 
 # File Name : preprocess.py
 # Purpose :
-# Creation Date : 10-12-2017
+# Creation Date : 18-02-2022
 # Last Modified : Thu 18 Jan 2018 05:34:42 PM CST
-# Created By : Jeasine Ma [jeasinema[at]gmail[dot]com]
+# Created By : Ammar Yasir Naich [ammar[dot]naich[at]gmail[dot]com]
 
 
-from voxel_generator import *
-
-
+from ctypes import util
 import numpy as np
+from pyrsistent import v
 from config import cfg
+import utils
+from utils.voxel_generator import *
+from utils import intensity_histogram 
+
+
+
 
 data_dir = 'velodyne'
 
-def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
-    voxel_size = [2, 2, 4]
-    point_cloud_range = [0, -40, -3, 70.4, 40, 1]
+def vfe_from_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
+    
+    """ Description
+    :type point_cloud: ndarray [M,4]
+    :param point_cloud:
+    
+    :type cls: string
+    :param cls: object names " Car, Pedestrian, Cyclist
+    
+    :rtype: dictionary containing keys for 'feature buffer', coordinate_buffer, 'number_buffer'
+
+    """
+    
+    # voxel_size = [2, 2, 4]
+    # point_cloud_range = [0, -40, -3, 70.4, 40, 1]
+    voxel_size = [0.2, 0.2, 0.4]
+    point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1] # config paraa taken from pointpilleer
     max_num_points = 35
     self = VoxelGenerator(voxel_size, point_cloud_range, max_num_points)
     voxels = self.generate(point_cloud)
-    voxels, coors, num_points_per_voxel = voxels
+    voxels, voxel_index, num_points_per_voxel = voxels
     
     
-    voxel_index = coors
-    # [K, 3] coordinate buffer as described in the paper
+    # [K, 3] coordinate buffer as described in the paper, is the non-emppty voxels index
     coordinate_buffer = np.unique(voxel_index, axis = 0)
 
-    K = len(coordinate_buffer)
+    K = len(coordinate_buffer) # number of voxels
     T = max_num_points
 
     # [K, 1] store number of points in each voxel grid
@@ -37,6 +55,15 @@ def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
 
     # [K, T, 7] feature buffer as described in the paper
     feature_buffer = np.zeros(shape = (K, T, 7), dtype = np.float32)
+        
+    print("Debug info about accelerated method for voxel generator")
+    print(self)
+    print("Selecting the dynamic grid size", self.grid_size)
+    print(f'Printing pointclouud shape',voxels.shape)
+    print(f'Printing feature voxel_index shape',voxel_index.shape)
+    print(f'Printing K value', K)
+    print("feature buffer shape", feature_buffer.shape)
+    
 
     # build a reverse index for coordinate buffer
     index_buffer = {}
@@ -107,8 +134,17 @@ def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
     number_buffer = np.zeros(shape = (K), dtype = np.int64)
 
     # [K, T, 7] feature buffer as described in the paper
+    # feature_buffer = np.zeros(shape = (K, T, 7), dtype = np.float32)
+    
+    # extending feature  duffer to include intensity signature
     feature_buffer = np.zeros(shape = (K, T, 7), dtype = np.float32)
 
+    # print("Debug info about author method for voxel generator")
+    # print(f'Printing pointclouud shape',point_cloud.shape)
+    # print(f'Printing feature voxel_index shape',voxel_index.shape)
+    # print(f'Printing K value', K)
+    # print("feature buffer shape", feature_buffer.shape)
+   
     # build a reverse index for coordinate buffer
     index_buffer = {}
     for i in range(K):
@@ -121,8 +157,30 @@ def process_pointcloud(point_cloud, cls = cfg.DETECT_OBJ):
             feature_buffer[index, number, :4] = point
             number_buffer[index] += 1
 
+
+    
     feature_buffer[:, :, -3:] = feature_buffer[:, :, :3] - \
         feature_buffer[:, :, :3].sum(axis = 1, keepdims = True)/number_buffer.reshape(K, 1, 1)
+    
+    
+    
+    
+        
+    # n_bin = 10
+    # intensity_values = feature_buffer[:, :, 3]
+    
+    # min_int_values = np.min(intensity_values)
+    # max_int_values = np.max(intensity_values)
+    # print("Overall feature dimensions",feature_buffer.shape)
+    # print("Number Buffer dimensions",number_buffer.shape )
+    # print("intensity_values shape",intensity_values.shape)
+    # print("min_int_values",min_int_values)
+    # print("max_int_values,max_int_values")
+    # hist,bin_edge = intensity_histogram.numba_gpu_histogram(feature_buffer[:, :, 3],n_bin)
+    # intensity_feature = intensity_histogram.generate_hist_feature(hist,bin_edge[:-1])
+    
+    # print("feature Dtype",type(intensity_feature))
+    # print("feature shape",intensity_feature.shape)
 
     voxel_dict = {'feature_buffer': feature_buffer,
                   'coordinate_buffer': coordinate_buffer,

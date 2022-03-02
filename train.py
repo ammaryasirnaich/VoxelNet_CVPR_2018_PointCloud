@@ -22,7 +22,12 @@ import torch.profiler
 
 from config import cfg
 from utils.utils import box3d_to_label
-from model.model import RPN3D
+
+
+# overriding the native model with the proposed model
+# from model.model import RPN3D 
+from model.cvmodel import RPN3D
+
 from loader.kitti import KITTI as Dataset
 from loader.kitti import collate_fn
 from torchvision import transforms
@@ -35,6 +40,7 @@ from utils import intensity_histogram
 
 import torch.onnx
 from torch.autograd import Variable
+from model.VoxelLoss import *
 
 
 parser = argparse.ArgumentParser(description = 'training')
@@ -92,6 +98,10 @@ def run():
 
     # Build model
     model = RPN3D(cfg.DETECT_OBJ, args.alpha, args.beta)
+    
+    
+    # define loss function
+    criterion = VoxelLoss(alpha=1.5, beta=1)
        
 
     # Resume model if necessary
@@ -150,7 +160,6 @@ def run():
     dummy_lidar =  torch.from_numpy(dummy_data[6]) 
     
 
-    
     # dummy_tag = torch.tensor([201819], dtype=torch.int64).cuda()   # convert to tensor 
     # dummy_labels =  dummy_labels_convertion
     # dummy_vox_feature=[]
@@ -168,19 +177,6 @@ def run():
     # # dummy_vox_cooridnate =  dummy_data[4]
     # dummy_rgb = dummy_data[5]
     # dummy_lidar =  dummy_data[6]
-   
-    
-    # print(type(dummy_tag))
-    # print(type(dummy_labels))
-    # print(type(dummy_data[2])) # ndarry
-    # print(type(dummy_vox_number))
-    
-    # print(type(dummy_vox_cooridnate))
-   
-    # print(type(dummy_rgb))
-    # print(type(dummy_lidar))
-    
-    
     
     
     # model_data = (Variable(dummy_tag), Variable(dummy_labels), Variable(dummy_vox_feature), Variable(dummy_vox_number),\
@@ -191,18 +187,12 @@ def run():
     
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
-    # print(type(_data_)
-    # print(type(dummy_data))
-    
-  
-      
-    
+
     with SummaryWriter(comment='VoxelNet') as w:
         w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, \
             dummy_vox_cooridnate] , verbose=False)
         w.close()
-        # w.add_graph(model, [dummy_data[0], dummy_data[1], dummy_data[2], dummy_data[3],\
-        #     dummy_data[4]] , verbose=False)
+
 
     print("function completed")
     print("VoxelNet added into the graph")
@@ -233,7 +223,6 @@ def run():
         tot_epoch = start_epoch
         for epoch in range(start_epoch, args.max_epoch):
             
-
             counter = 0
             batch_time = time.time()
 
@@ -244,48 +233,40 @@ def run():
                
                 model.train(True)   # Training mode
 
+                #Note:Ammar Yasir
+                # clear the gradients, beacuse gradients use to get accumlated on very pass forward and backward
+                optimizer.zero_grad()
+
                 counter += 1
                 global_counter += 1
 
                 start_time = time.time()
 
                 # Forward pass for training
-                _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data[0],data[1],data[2],data[4])
+                tag,true_label,vox_feature,vox_number,vox_coordinate = data     
+                pcm, rm = model(vox_feature,vox_coordinate)
+                loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
 
-                # _, _, loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(data)
-
-                  #Note:Ammar Yasir
-                optimizer.zero_grad()
-
-                # 
+                # Doing the forward pass, backward pass, then updating the weights
                 forward_time = time.time() - start_time
-
                 loss.backward()
 
                 # Clip gradient
                 clip_grad_norm_(model.parameters(), 5)
-                
 
                 optimizer.step()
-                
-                
+   
                 # Note: Ammaar
                 #   In PyTorch 1.1.0 and later, you should call them in the opposite order: 
                 #   `optimizer.step()` before `lr_scheduler.step()’
                 # Learning rate scheme
                 lr_sched.step()
                 
-                
-                #Note:Ammar, zero_grad() should be before called before optimizer.step
-                # optimizer.zero_grad()
-
                 batch_time = time.time() - batch_time
                 
                 
-                #  Need to call this at the end of each step to notify profiler of steps' boundary. 
+                ## Need to call this at the end of each step to notify profiler of steps' boundary. 
                 #prof.step() 
-                
-                
                 
 
                 if counter % args.print_freq == 0:
@@ -310,24 +291,23 @@ def run():
                                                                 'train/cls_pos_loss' : cls_pos_loss_rec.item(),
                                                                 'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
                 
-                
-                
+                                
                 # Summarize validation info
                 if counter % args.summary_val_interval == 0:
                     print('summary_val_interval now')
 
                     with torch.no_grad():
                         model.train(False)  # Validation mode
-
                         val_data = next(val_dataloader_iter)    # Sample one batch
-                        
-                    
+                                           
                         # Forward pass for validation and prediction
                         # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
                         
-                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[4])
-
-
+                        # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[4])
+                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data     
+                        pcm, rm = model(vox_feature,vox_coordinate)
+                        val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
+                        
                         summary_writer.add_scalars(str(epoch + 1), {'validate/loss': loss.item(),
                                                                     'validate/reg_loss': reg_loss.item(),
                                                                     'validate/cls_loss': cls_loss.item(),
@@ -336,7 +316,7 @@ def run():
 
                         try:
                             # Prediction
-                            tags, ret_box3d_scores, ret_summary = model.module.predict(val_data, probs, deltas, summary = True)
+                            tags, ret_box3d_scores, ret_summary = model.module.predict(val_data, pcm, rm, summary = True)                      
 
                             for (tag, img) in ret_summary:
                                 img = img[0].transpose(2, 0, 1)
@@ -388,14 +368,17 @@ def run():
                         print('Validation data instance {}'.format(i))
 
                         # Forward pass for validation and prediction
-                        probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
+                        # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
+                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data     
+                        pcm, rm = model(vox_feature,vox_coordinate)
+                        val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
 
                         front_images, bird_views, heatmaps = None, None, None
                         if args.vis:
                             tags, ret_box3d_scores, front_images, bird_views, heatmaps = \
-                                model.module.predict(val_data, probs, deltas, summary = False, vis = True)
+                                model.module.predict(val_data, pcm, rm, summary = False, vis = True)
                         else:
-                            tags, ret_box3d_scores = model.module.predict(val_data, probs, deltas, summary = False, vis = False)
+                            tags, ret_box3d_scores = model.module.predict(val_data, pcm, rm, summary = False, vis = False)
 
                         # tags: (N)
                         # ret_box3d_scores: (N, N'); (class, x, y, z, h, w, l, rz, score)
