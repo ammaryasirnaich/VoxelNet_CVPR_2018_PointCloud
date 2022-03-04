@@ -27,6 +27,7 @@ from utils.utils import box3d_to_label
 # overriding the native model with the proposed model
 # from model.model import RPN3D 
 from model.cvmodel import RPN3D
+from model.VoxelLoss import *
 
 from loader.kitti import KITTI as Dataset
 from loader.kitti import collate_fn
@@ -40,7 +41,7 @@ from utils import intensity_histogram
 
 import torch.onnx
 from torch.autograd import Variable
-from model.VoxelLoss import *
+
 
 
 parser = argparse.ArgumentParser(description = 'training')
@@ -51,7 +52,7 @@ parser.add_argument('--beta', type = float, default = 1, help = 'beta in loss fu
 
 parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')  # default epoch was 1
 parser.add_argument('--batch_size', type = int, default = 1, help = 'batch size')
-parser.add_argument('--workers', type = int, default = 1)  #4
+parser.add_argument('--workers', type = int, default = 12)  #4
 
 parser.add_argument('--summary_interval', type = int, default = 100, help = 'iter interval for training summary')
 parser.add_argument('--summary_val_interval', type = int, default = 200, help = 'iter interval for val summary')
@@ -69,6 +70,7 @@ parser.add_argument('--saved_model', type = str, default = 'kitti_{}.pth.tar')
 # For test data
 parser.add_argument('--output_path', type = str, default = './preds', help = 'results output dir')
 parser.add_argument('--vis', type = bool, default = True, help = 'set to True if dumping visualization')
+parser.add_argument('--profile_logger', type = list, default = [100,300], help = 'logging interval for tensorboard profiler')
 
 args = parser.parse_args()
 
@@ -91,7 +93,7 @@ def run():
     val_dataloader = DataLoader(val_dataset, batch_size = args.batch_size, shuffle = False, collate_fn = collate_fn,
                                 num_workers = args.workers, pin_memory = False)
    
-    val_dataloader_iter = iter(val_dataloader)
+    val_dataloader_iter = iter(val_dataloader) # to be used for Summarize validation info
     
     # feature = intensity_histogram.hist_test()
     
@@ -101,7 +103,7 @@ def run():
     
     
     # define loss function
-    criterion = VoxelLoss(alpha=1.5, beta=1)
+    criterion = VoxelLoss(alpha=1.5, beta=1,sigma=3)
        
 
     # Resume model if necessary
@@ -187,14 +189,12 @@ def run():
     
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
-
+        
+    # to generate a graph in tensorboard uncomment the below code block
     with SummaryWriter(comment='VoxelNet') as w:
-        w.add_graph(model, [dummy_tag, dummy_labels_convertion, dummy_vox_feature, \
+        w.add_graph(model, [dummy_vox_feature, \
             dummy_vox_cooridnate] , verbose=False)
         w.close()
-
-
-    print("function completed")
     print("VoxelNet added into the graph")
     
     
@@ -243,7 +243,7 @@ def run():
                 start_time = time.time()
 
                 # Forward pass for training
-                tag,true_label,vox_feature,vox_number,vox_coordinate = data     
+                tag,true_label,vox_feature,vox_number,vox_coordinate = data[0],data[1],data[2],data[3],data[4]     
                 pcm, rm = model(vox_feature,vox_coordinate)
                 loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
 
@@ -256,7 +256,7 @@ def run():
 
                 optimizer.step()
    
-                # Note: Ammaar
+                # Note:
                 #   In PyTorch 1.1.0 and later, you should call them in the opposite order: 
                 #   `optimizer.step()` before `lr_scheduler.step()’
                 # Learning rate scheme
@@ -265,8 +265,9 @@ def run():
                 batch_time = time.time() - batch_time
                 
                 
-                ## Need to call this at the end of each step to notify profiler of steps' boundary. 
-                #prof.step() 
+                ## Need to call this at the end of each step to notify profiler of steps' boundary.
+                if counter in args.profile_logger:
+                    prof.step() 
                 
 
                 if counter % args.print_freq == 0:
@@ -304,7 +305,7 @@ def run():
                         # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data)
                         
                         # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model( val_data[0],val_data[1],val_data[2],val_data[4])
-                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data     
+                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]     
                         pcm, rm = model(vox_feature,vox_coordinate)
                         val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
                         
@@ -369,7 +370,7 @@ def run():
 
                         # Forward pass for validation and prediction
                         # probs, deltas, val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = model(val_data[0],val_data[1],val_data[2],val_data[4])
-                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data     
+                        tag,true_label,vox_feature,vox_number,vox_coordinate = val_data[0],val_data[1],val_data[2],val_data[3],val_data[4]     
                         pcm, rm = model(vox_feature,vox_coordinate)
                         val_loss, val_cls_loss, val_reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
 

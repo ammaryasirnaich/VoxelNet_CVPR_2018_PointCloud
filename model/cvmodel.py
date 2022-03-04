@@ -45,14 +45,6 @@ class RPN3D(nn.Module):
             pcm(tensor): Probability score map
             rm(tensor):  Regression map
         """        
-        # _tag,_label,_vox_feature,_vox_number,_vox_coordinate
-        
-        # tag = data[0]
-        # label = data[1]
-        # vox_feature = data[2]
-        # vox_number = data[3]
-        # vox_coordinate = data[4]
-
         features = self.feature(vox_feature, vox_coordinate)
         pcm, rm = self.rpn(features)
         return pcm, rm

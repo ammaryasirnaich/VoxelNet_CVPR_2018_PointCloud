@@ -394,65 +394,40 @@ def draw_lidar_box3d_on_image(img, boxes3d, scores, gt_boxes3d = np.array([]), c
     #   boxes3d (N, 7) [x, y, z, h, w, l, r]
     #   scores
     #   gt_boxes3d (N, 7) [x, y, z, h, w, l, r]
+     #Note: predicted box color=(0, 255, 255) = blue, ground truth box gt_color=(255, 0, 255)= purple
     img = img.copy()
     projections = lidar_box3d_to_camera_box(boxes3d, cal_projection = True, P2 = P2, T_VELO_2_CAM = T_VELO_2_CAM, R_RECT_0 = R_RECT_0)
     gt_projections = lidar_box3d_to_camera_box(gt_boxes3d, cal_projection = True, P2 = P2, T_VELO_2_CAM = T_VELO_2_CAM, R_RECT_0 = R_RECT_0)
 
-
-    # #Note:AMMAR checking for any Nan elements   
-    # if (np.isnan(projections.any()) or np.isnan(gt_projections.any()) ):
-    #     np.savetxt("image.txt", img)
-    #     np.savetxt("boxes3d.txt", boxes3d)
-    #     np.savetxt("gt_boxes3d.txt", gt_boxes3d)
-    #     np.savetxt("scores.txt", scores)
-             
-    #     return
-       
-
-    # Draw projections 
+    # draw projections
     for qs in projections:
-        
         for k in range(0, 4):
             i, j = k, (k + 1) % 4
-            
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 qs[j, 1]), color, thickness, cv2.LINE_AA)
-        
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
+
             i, j = k + 4, (k + 1) % 4 + 4
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 qs[j, 1]), color, thickness, cv2.LINE_AA)
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
 
             i, j = k, k + 4
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 
-                                                 qs[j, 1]), color, thickness, cv2.LINE_AA)
-    # Draw gt projections
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
+
+    # draw gt projections
     for qs in gt_projections:
         for k in range(0, 4):
             i, j = k, (k + 1) % 4
-            
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
 
-            i, j = k + 4, (k + 1) % 4 + 4      
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
+            i, j = k + 4, (k + 1) % 4 + 4
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
 
             i, j = k, k + 4
-            #Note:Ammar
-            conver_nan_zero(qs,i,j) #check if nan and handle the issue
-            cv2.line(img, (qs[i, 0], qs[i, 1]), (qs[j, 0],
-                                                 qs[j, 1]), gt_color, thickness, cv2.LINE_AA)
+            cv2.line(img, (int(qs[i, 0]), int(qs[i, 1])), (int(qs[j, 0]),
+                                                 int(qs[j, 1])), color, thickness, cv2.LINE_AA)
 
     return cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_BGR2RGB)
 
@@ -631,22 +606,19 @@ def cal_rpn_target(labels, feature_map_shape, anchors, cls = 'Car', coordinate =
     #   targets (N, w, l, 14)
     # Attention: cal IoU on birdview
 
-   
     #Note: Ammar
     # :Provision for using Onnax and Tensorboard 
     # For using the above tools the labels were used as list hence no shape
     # function is there, for that we convert the list to numpy array to use the 
     # function
-    if(isinstance(labels, list)):
-        labels = [['Car 0.0000 0.0000 0.0000 416.0000 183.0000 446.0000 207.0000 1.4598 1.6599 4.1597 -11.8981 2.0964 48.3634 1.4081\n'
-                    'DontCare 0.0000 0.0000 0.0000 1104.0000 795.0000 1104.0000 796.0000 0.9999 0.9999 1.0000 -801.1735 -1003.3474 -1162.5367 -0.7571\n']]
-        # print(type(labels))
-        # print(labels) 
-        # temp_labels = ''.join(str(labels).split(','))
-        # print(temp_labels.shape)
-        labels= np.array(labels)
-        
-   
+    # if(isinstance(labels, list)):
+    #     # labels = [['Car 0.0000 0.0000 0.0000 416.0000 183.0000 446.0000 207.0000 1.4598 1.6599 4.1597 -11.8981 2.0964 48.3634 1.4081\n'
+    #     #             'DontCare 0.0000 0.0000 0.0000 1104.0000 795.0000 1104.0000 796.0000 0.9999 0.9999 1.0000 -801.1735 -1003.3474 -1162.5367 -0.7571\n']]
+    #     # print(type(labels))
+    #     # print(labels) 
+    #     # temp_labels = ''.join(str(labels).split(','))
+    #     # print(temp_labels.shape)
+    #     labels= np.array(labels)   
     # labels = labels.numpy()
     # print(type(labels))
     # print(labels.shape)

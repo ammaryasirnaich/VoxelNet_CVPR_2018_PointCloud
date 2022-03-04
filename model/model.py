@@ -54,6 +54,7 @@ class RPN3D(nn.Module):
         # Calculate ground-truth
         pos_equal_one, neg_equal_one, targets = cal_rpn_target(
             label, self.rpn_output_shape, self.anchors, cls = cfg.DETECT_OBJ, coordinate = 'lidar')
+        
         pos_equal_one_for_reg = np.concatenate(
             [np.tile(pos_equal_one[..., [0]], 7), np.tile(pos_equal_one[..., [1]], 7)], axis = -1)
         pos_equal_one_sum = np.clip(np.sum(pos_equal_one, axis = (1, 2, 3)).reshape(-1, 1, 1, 1), a_min = 1, a_max = None)

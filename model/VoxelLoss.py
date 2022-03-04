@@ -7,13 +7,17 @@ from config import cfg
 from utils.utils import *
 
 class VoxelLoss(nn.Module):
-    def __init__(self, alpha, beta):
+    def __init__(self, alpha = 1.5, beta = 1, sigma = 3):
         super(VoxelLoss, self).__init__()
-        self.smoothl1loss = nn.SmoothL1Loss(size_average=False)
+        self.smoothl1loss = nn.SmoothL1Loss(size_average=None)
         self.alpha = alpha
         self.beta = beta
+        self.sigma = sigma
+         # Generate anchors
+        self.anchors = cal_anchors()    # [cfg.FEATURE_HEIGHT, cfg.FEATURE_WIDTH, 2, 7]; 2 means two rotations; 7 means (cx, cy, cz, h, w, l, r)
+        self.small_addon_for_BCE = 1e-6
 
-    def forward(self, true_label,rm,psm):
+    def forward(self, true_label,psm,rm):
         """_summary_
         This function calucate the losses of classication and regression for RPN.
         Args:
@@ -31,32 +35,44 @@ class VoxelLoss(nn.Module):
         """
         
         self.rpn_output_shape = [cfg.FEATURE_HEIGHT, cfg.FEATURE_WIDTH]
+       
         # Calculate ground-truth
         pos_equal_one, neg_equal_one, targets = cal_rpn_target( 
             true_label, self.rpn_output_shape, self.anchors, cls = cfg.DETECT_OBJ, coordinate = 'lidar') 
         
-                
-        p_pos = F.sigmoid(psm.permute(0,2,3,1))
-        rm = rm.permute(0,2,3,1).contiguous()
-        rm = rm.view(rm.size(0),rm.size(1),rm.size(2),-1,7)
-        targets = targets.view(targets.size(0),targets.size(1),targets.size(2),-1,7)
-        pos_equal_one_for_reg = pos_equal_one.unsqueeze(pos_equal_one.dim()).expand(-1,-1,-1,-1,7)
-
-        rm_pos = rm * pos_equal_one_for_reg
-        targets_pos = targets * pos_equal_one_for_reg
-
-        cls_pos_loss = -pos_equal_one * torch.log(p_pos + 1e-6)
-        cls_pos_loss = cls_pos_loss.sum() / (pos_equal_one.sum() + 1e-6)
-
-        cls_neg_loss = -neg_equal_one * torch.log(1 - p_pos + 1e-6)
-        cls_neg_loss = cls_neg_loss.sum() / (neg_equal_one.sum() + 1e-6)
-
         
-        reg_loss = self.smoothl1loss(rm_pos, targets_pos)
-        reg_loss = reg_loss / (pos_equal_one.sum() + 1e-6)
-        conf_loss = self.alpha * cls_pos_loss + self.beta * cls_neg_loss
-        
+        pos_equal_one_for_reg = np.concatenate(
+            [np.tile(pos_equal_one[..., [0]], 7), np.tile(pos_equal_one[..., [1]], 7)], axis = -1)
+        pos_equal_one_sum = np.clip(np.sum(pos_equal_one, axis = (1, 2, 3)).reshape(-1, 1, 1, 1), a_min = 1, a_max = None)
+        neg_equal_one_sum = np.clip(np.sum(neg_equal_one, axis = (1, 2, 3)).reshape(-1, 1, 1, 1), a_min = 1, a_max = None)
+
+        # Move to gpu
+        pos_equal_one = torch.from_numpy(pos_equal_one).float().cuda()
+        neg_equal_one = torch.from_numpy(neg_equal_one).float().cuda()
+        targets = torch.from_numpy(targets).float().cuda()
+        pos_equal_one_for_reg = torch.from_numpy(pos_equal_one_for_reg).float().cuda()
+        pos_equal_one_sum = torch.from_numpy(pos_equal_one_sum).float().cuda()
+        neg_equal_one_sum = torch.from_numpy(neg_equal_one_sum).float().cuda()
+
+        # [batch, cfg.FEATURE_HEIGHT, cfg.FEATURE_WIDTH, 2/14] -> [batch, 2/14, cfg.FEATURE_HEIGHT, cfg.FEATURE_WIDTH]
+        pos_equal_one = pos_equal_one.permute(0, 3, 1, 2)
+        neg_equal_one = neg_equal_one.permute(0, 3, 1, 2)
+        targets = targets.permute(0, 3, 1, 2)
+        pos_equal_one_for_reg = pos_equal_one_for_reg.permute(0, 3, 1, 2)
+
+        # Calculate loss
+        cls_pos_loss = (-pos_equal_one * torch.log(psm + self.small_addon_for_BCE)) / pos_equal_one_sum
+        cls_neg_loss = (-neg_equal_one * torch.log(1 - psm + self.small_addon_for_BCE)) / neg_equal_one_sum
+
+        conf_loss = torch.sum(self.alpha * cls_pos_loss + self.beta * cls_neg_loss)
+        cls_pos_loss_rec = torch.sum(cls_pos_loss)
+        cls_neg_loss_rec = torch.sum(cls_neg_loss)
+
+      
+        reg_loss = self.smoothl1loss(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg)
+        reg_loss = torch.sum(reg_loss)
+
         accumulate_loss = conf_loss + reg_loss
         
-        return accumulate_loss, conf_loss, reg_loss ,cls_pos_loss, cls_neg_loss
+        return accumulate_loss, conf_loss, reg_loss , cls_pos_loss_rec, cls_neg_loss_rec
         
