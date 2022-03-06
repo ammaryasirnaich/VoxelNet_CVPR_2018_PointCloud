@@ -4,9 +4,11 @@ import torch
 import torch.nn as nn
 
 from config import cfg
+from utils.nms import nms
 from utils.utils import *
 from utils.colorize import colorize
-from utils.nms import nms
+# from utils.nms import nms
+from torchvision import ops
 from model.group_pointcloud import FeatureNet
 from model.middle_rpn import MiddleAndRPN
 
@@ -94,11 +96,16 @@ class RPN3D(nn.Module):
             boxes2d = corner_to_standup_box2d(center_to_corner_box2d(tmp_boxes2d, coordinate = 'lidar'))
 
             # 2D box index after nms
-            ind, cnt = nms(torch.from_numpy(boxes2d).to(device), torch.from_numpy(tmp_scores).to(device),
-                           cfg.RPN_NMS_THRESH, cfg.RPN_NMS_POST_TOPK)
+            # ind, cnt = nms(torch.from_numpy(boxes2d).to(device), torch.from_numpy(tmp_scores).to(device),
+            #                cfg.RPN_NMS_THRESH, cfg.RPN_NMS_POST_TOPK)
+            # ind = ind[:cnt].cpu().detach().numpy()
             
-            ind = ind[:cnt].cpu().detach().numpy()
+            ind = ops.nms(torch.from_numpy(boxes2d).to(device), torch.from_numpy(tmp_scores).to(device),
+                           cfg.RPN_NMS_THRESH)
+            
+            ind = ind.cpu().detach().numpy()
 
+            
             tmp_boxes3d = tmp_boxes3d[ind, ...]
             tmp_scores = tmp_scores[ind]
             ret_box3d.append(tmp_boxes3d)

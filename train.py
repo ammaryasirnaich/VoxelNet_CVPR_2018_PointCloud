@@ -50,7 +50,7 @@ parser.add_argument('--lr', type = float, default = 0.01, help = 'initial learni
 parser.add_argument('--alpha', type = float, default = 1.5, help = 'alpha in loss function')
 parser.add_argument('--beta', type = float, default = 1, help = 'beta in loss function')
 
-parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')  # default epoch was 1
+parser.add_argument('--max_epoch', type = int, default = 150, help = 'max epoch')  # default epoch was 1
 parser.add_argument('--batch_size', type = int, default = 1, help = 'batch size')
 parser.add_argument('--workers', type = int, default = 12)  #4
 
@@ -184,9 +184,7 @@ def run():
     # model_data = (Variable(dummy_tag), Variable(dummy_labels), Variable(dummy_vox_feature), Variable(dummy_vox_number),\
     #         Variable(dummy_vox_cooridnate))  #, dummy_rgb, dummy_lidar
     
-    # torch.tensor(dummy_tag, device='cuda'),torch.tensor(dummy_labels, device='cuda'),\
-    
-    
+    # torch.tensor(dummy_tag, device='cuda'),torch.tensor(dummy_labels, device='cuda'),\  
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
         

@@ -68,11 +68,28 @@ class VoxelLoss(nn.Module):
         cls_pos_loss_rec = torch.sum(cls_pos_loss)
         cls_neg_loss_rec = torch.sum(cls_neg_loss)
 
-      
-        reg_loss = self.smoothl1loss(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg)
+        ## using pytorch nn.smoothl1loss function
+        # reg_loss = self.smoothl1loss(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg)
+        
+        ## using author defined loss function
+        reg_loss = smooth_l1(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg, self.sigma) / pos_equal_one_sum
         reg_loss = torch.sum(reg_loss)
 
         accumulate_loss = conf_loss + reg_loss
         
         return accumulate_loss, conf_loss, reg_loss , cls_pos_loss_rec, cls_neg_loss_rec
         
+
+
+def smooth_l1(deltas, targets, sigma = 3.0):
+    # Reference: https://mohitjainweb.files.wordpress.com/2018/03/smoothl1loss.pdf
+    sigma2 = sigma * sigma
+    diffs = deltas - targets
+    smooth_l1_signs = torch.lt(torch.abs(diffs), 1.0 / sigma2).float()
+
+    smooth_l1_option1 = torch.mul(diffs, diffs) * 0.5 * sigma2
+    smooth_l1_option2 = torch.abs(diffs) - 0.5 / sigma2
+    smooth_l1_add = torch.mul(smooth_l1_option1, smooth_l1_signs) + torch.mul(smooth_l1_option2, 1 - smooth_l1_signs)
+    smooth_l1 = smooth_l1_add
+
+    return smooth_l1
