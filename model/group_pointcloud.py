@@ -73,13 +73,12 @@ class FeatureNet(nn.Module):
         # [ΣK, 138] 
         temp_hist_feature = feature[:,:,3:4]
         # print("voxel Intensity values shape",temp_hist_feature.shape)
-        
+
         final_feature = torch.zeros((voxelwise.shape[0],10)).cuda()
         for row in range(voxelwise.shape[0]):
             hist = torch.histc(temp_hist_feature[row], bins=10,min=0,max=1) 
             final_feature[row,:] = hist
 
-       
         voxelwise = torch.cat((voxelwise,final_feature ),1)
         
         # print("[ΣK, 138]",hist_feature.shape)

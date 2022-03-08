@@ -68,9 +68,6 @@ class VoxelLoss(nn.Module):
         cls_pos_loss_rec = torch.sum(cls_pos_loss)
         cls_neg_loss_rec = torch.sum(cls_neg_loss)
 
-        ## using pytorch nn.smoothl1loss function
-        # reg_loss = self.smoothl1loss(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg)
-        
         ## using author defined loss function
         reg_loss = smooth_l1(rm * pos_equal_one_for_reg, targets * pos_equal_one_for_reg, self.sigma) / pos_equal_one_sum
         reg_loss = torch.sum(reg_loss)

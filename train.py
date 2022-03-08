@@ -50,9 +50,9 @@ parser.add_argument('--lr', type = float, default = 0.01, help = 'initial learni
 parser.add_argument('--alpha', type = float, default = 1.5, help = 'alpha in loss function')
 parser.add_argument('--beta', type = float, default = 1, help = 'beta in loss function')
 
-parser.add_argument('--max_epoch', type = int, default = 150, help = 'max epoch')  # default epoch was 1
+parser.add_argument('--max_epoch', type = int, default = 1, help = 'max epoch')  # default epoch was 1
 parser.add_argument('--batch_size', type = int, default = 1, help = 'batch size')
-parser.add_argument('--workers', type = int, default = 12)  #4
+parser.add_argument('--workers', type = int, default = 4)  #4
 
 parser.add_argument('--summary_interval', type = int, default = 100, help = 'iter interval for training summary')
 parser.add_argument('--summary_val_interval', type = int, default = 200, help = 'iter interval for val summary')
@@ -70,7 +70,7 @@ parser.add_argument('--saved_model', type = str, default = 'kitti_{}.pth.tar')
 # For test data
 parser.add_argument('--output_path', type = str, default = './preds', help = 'results output dir')
 parser.add_argument('--vis', type = bool, default = True, help = 'set to True if dumping visualization')
-parser.add_argument('--profile_logger', type = list, default = [100,300], help = 'logging interval for tensorboard profiler')
+parser.add_argument('--profile_logger', type = list, default = 200, help = 'logging interval for tensorboard profiler')
 
 args = parser.parse_args()
 
@@ -188,12 +188,12 @@ def run():
     # _tag_dummy_input = torch.tensor(dummy_tag, device='cuda')
     
         
-    # to generate a graph in tensorboard uncomment the below code block
-    with SummaryWriter(comment='VoxelNet') as w:
-        w.add_graph(model, [dummy_vox_feature, \
-            dummy_vox_cooridnate] , verbose=False)
-        w.close()
-    print("VoxelNet added into the graph")
+    ## to generate a graph in tensorboard uncomment the below code block
+    # with SummaryWriter(comment='VoxelNet') as w:
+    #     w.add_graph(model, [dummy_vox_feature, \
+    #         dummy_vox_cooridnate] , verbose=False)
+    #     w.close()
+    # print("VoxelNet added into the graph")
     
     
     # input_names = [ "actual_input_1" ] + [ "learned_%d" % i for i in range(16) ]
@@ -207,23 +207,20 @@ def run():
         activities=[
             torch.profiler.ProfilerActivity.CPU,
             torch.profiler.ProfilerActivity.CUDA],
-        schedule=torch.profiler.schedule(
-            wait=1,
-            warmup=1,
-            active=2),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler('./result', worker_name='worker0'),
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('./profiler_status', worker_name='worker0'),
         record_shapes=True,
-        profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
-        with_stack=True
+        profile_memory=False,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
+        with_stack=False
     ) as prof: 
-        
+
     # train and validate
         tot_epoch = start_epoch
+        print(f'Total Epoch called for',args.max_epoch)
+
         for epoch in range(start_epoch, args.max_epoch):
-            
             counter = 0
             batch_time = time.time()
-
             tot_val_loss = 0
             tot_val_times = 0
 
@@ -237,13 +234,17 @@ def run():
 
                 counter += 1
                 global_counter += 1
-
                 start_time = time.time()
 
                 # Forward pass for training
                 tag,true_label,vox_feature,vox_number,vox_coordinate = data[0],data[1],data[2],data[3],data[4]     
                 pcm, rm = model(vox_feature,vox_coordinate)
                 loss, cls_loss, reg_loss, cls_pos_loss_rec, cls_neg_loss_rec = criterion(true_label,pcm,rm)
+
+                ## Need to call this at the end of each step to notify profiler of steps' boundary.
+                # if counter % args.profile_logger==0:
+                #     print(f'Profiler called at',counter,' instance')
+                #     prof.step()
 
                 # Doing the forward pass, backward pass, then updating the weights
                 forward_time = time.time() - start_time
@@ -261,12 +262,6 @@ def run():
                 lr_sched.step()
                 
                 batch_time = time.time() - batch_time
-                
-                
-                ## Need to call this at the end of each step to notify profiler of steps' boundary.
-                if counter in args.profile_logger:
-                    prof.step() 
-                
 
                 if counter % args.print_freq == 0:
                     # Print training info
@@ -289,8 +284,7 @@ def run():
                                                                 'train/cls_loss' : cls_loss.item(),
                                                                 'train/cls_pos_loss' : cls_pos_loss_rec.item(),
                                                                 'train/cls_neg_loss' : cls_neg_loss_rec.item()}, global_counter)
-                
-                                
+
                 # Summarize validation info
                 if counter % args.summary_val_interval == 0:
                     print('summary_val_interval now')
@@ -312,37 +306,23 @@ def run():
                                                                     'validate/cls_loss': cls_loss.item(),
                                                                     'validate/cls_pos_loss': cls_pos_loss_rec.item(),
                                                                     'validate/cls_neg_loss': cls_neg_loss_rec.item()}, global_counter)
-
                         try:
                             # Prediction
+                            print(f'Prediction block called at',counter,' th interval')
                             tags, ret_box3d_scores, ret_summary = model.module.predict(val_data, pcm, rm, summary = True)                      
 
                             for (tag, img) in ret_summary:
                                 img = img[0].transpose(2, 0, 1)
                                 summary_writer.add_image(tag, img, global_counter)
-                                
-                                #Note:Ammar Yasir
-                                # log the graph of the model
-                                # print(f'Printing data types for add_graph()')
-                                # print(type(val_data))
-                                # val_data_tensor= torch.tensor([float(item) for item in val_data], dtype=torch.float)     
-                                # print(type(val_data_tensor))
-                                # print(type(model.module))
-                                # summary_writer.add_graph(model.module,val_data,True)
                                 summary_writer.flush()
-                                
-                                
                         except:
                             raise Exception('Prediction skipped due to an error!')
-
                         # Add sampled data loss
                         tot_val_loss += val_loss.item()
                         tot_val_times += 1
 
                 batch_time = time.time()
-            
-            
-            
+
             # Save the best model
             avg_val_loss = tot_val_loss / float(tot_val_times)
             is_best = avg_val_loss < min_loss
@@ -413,6 +393,7 @@ def run():
 
     
     # Close TensorBoardX writer
+    prof.close()
     summary_writer.close()
 
 
